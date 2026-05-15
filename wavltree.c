@@ -1,36 +1,32 @@
 #include <linux/module.h>
 #include <linux/rbtree.h> 
 
-/* ==========================================================
- * 利用 __rb_parent_color 的最低 2 個 bits 來儲存 Rank 差值 (Rank Difference)
- * WAVL 的 Rank 差值通常是 1 或 2，剛好可以用 2 bits (01 或 10) 存。
- * ========================================================== */
-#define WAVL_RANK_MASK 3UL       // binary 11
-#define WAVL_PARENT_MASK ~3UL    
 
+#define WAVL_PARITY_MASK 1UL       
+#define WAVL_PARENT_MASK ~1UL    
 
-static inline unsigned long wavl_rank_diff(struct rb_node *node) {
-    return node->__rb_parent_color & WAVL_RANK_MASK;       //caller need to check whether rb_node is null or not 
+// get node parity
+static inline unsigned long wavl_parity(struct rb_node *node) {
+    return node->__rb_parent_color & WAVL_PARITY_MASK;
 }
 
+// get parent pointer
 static inline struct rb_node *wavl_parent(struct rb_node *node) {
     return (struct rb_node *)(node->__rb_parent_color & WAVL_PARENT_MASK);
 }
 
-//   set parent pointer while setting rankdiff
-static inline void wavl_set_parent_rank(struct rb_node *node, struct rb_node *parent, unsigned long rank_diff) {
-    node->__rb_parent_color = (unsigned long)parent | (rank_diff & WAVL_RANK_MASK);
+// set parity without changing parent 
+static inline void wavl_set_parity(struct rb_node *node, unsigned long parity) {
+    node->__rb_parent_color = (node->__rb_parent_color & WAVL_PARENT_MASK) | (parity & WAVL_PARITY_MASK);
 }
-
-// set node rankdiff without changing its parent pointer
-static inline void wavl_set_rank_diff(struct rb_node *node, unsigned long rank_diff) {
-    node->__rb_parent_color = (node->__rb_parent_color & WAVL_PARENT_MASK) | (rank_diff & WAVL_RANK_MASK);
+static inline void wavl_flip_parity(struct rb_node *node) {
+    node->__rb_parent_color ^= WAVL_PARITY_MASK;
 }
-
-/* ==========================================================
- * 戰區二：基礎樹狀操作 (Rotations & BST Logic)
- * 這裡你需要實作左旋與右旋，注意旋轉時要更新 rank_diff
- * ========================================================== */
+static inline unsigned long wavl_rank_diff(struct rb_node *parent, struct rb_node *child) {
+    unsigned long p_parity = wavl_parity(parent);
+    unsigned long c_parity = child ? wavl_parity(child) : 1UL; 
+    return (p_parity != c_parity) ? 1UL : 2UL;
+}
 
 static void wavl_rotate_left(struct rb_node *node, struct rb_root *root) {
     struct rb_node *right = node->rb_right;
