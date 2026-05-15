@@ -5,27 +5,24 @@
  * 利用 __rb_parent_color 的最低 2 個 bits 來儲存 Rank 差值 (Rank Difference)
  * WAVL 的 Rank 差值通常是 1 或 2，剛好可以用 2 bits (01 或 10) 存。
  * ========================================================== */
-#define WAVL_RANK_MASK 3UL       // 二進位 11
-#define WAVL_PARENT_MASK ~3UL    // 濾掉最後兩個 bits，取得乾淨指標
+#define WAVL_RANK_MASK 3UL       // binary 11
+#define WAVL_PARENT_MASK ~3UL    
 
-// 取得 Rank 差值
+
 static inline unsigned long wavl_rank_diff(struct rb_node *node) {
-    // 防呆：如果是 NULL，依照 WAVL 定義，外部虛擬節點的 rank 差值通常視為 1 或特定值
-    if (!node) return 1; 
-    return node->__rb_parent_color & WAVL_RANK_MASK;
+    return node->__rb_parent_color & WAVL_RANK_MASK;       //caller need to check whether rb_node is null or not 
 }
 
-// 取得 Parent 指標
 static inline struct rb_node *wavl_parent(struct rb_node *node) {
     return (struct rb_node *)(node->__rb_parent_color & WAVL_PARENT_MASK);
 }
 
-// 同時設定 Parent 與 Rank 差值
+//   set parent pointer while setting rankdiff
 static inline void wavl_set_parent_rank(struct rb_node *node, struct rb_node *parent, unsigned long rank_diff) {
     node->__rb_parent_color = (unsigned long)parent | (rank_diff & WAVL_RANK_MASK);
 }
 
-// 設定單一節點的 Rank 差值 (不改變 parent)
+// set node rankdiff without changing its parent pointer
 static inline void wavl_set_rank_diff(struct rb_node *node, unsigned long rank_diff) {
     node->__rb_parent_color = (node->__rb_parent_color & WAVL_PARENT_MASK) | (rank_diff & WAVL_RANK_MASK);
 }
@@ -82,25 +79,39 @@ void wavl_insert_color(struct rb_node *node, struct rb_root *root) {
     // 新插入的節點預設與 parent 的 rank 差值為 0 (產生 0-1 違規)
     wavl_set_rank_diff(node, 0); 
 
-    while (true) {
-        parent = wavl_parent(node);
-        if (!parent) {
-            // 到達 Root，Root 的 Rank 差值強制為 1 (或不理它)
-            break;
-        }
+    while (node != root->rb_node) {
+    struct rb_node *parent = rb_parent(node);
+    
+    // 如果跟爸爸的差值是 1 或 2，代表已經平衡，直接結束
+    if (wavl_rank_diff(parent, node) > 0)
+        break; 
 
-        // 判斷 node 是左子節點還是右子節點
-        if (parent->rb_left == node) {
-            sibling = parent->rb_right;
-            // TODO: WAVL 插入邏輯 (左側)
-            // 1. 如果 sibling 的 rank_diff == 1 -> Rank Promotion (提拔 Parent)
-            // 2. 如果 sibling 的 rank_diff == 2 -> 進行單旋轉或雙旋轉修復 -> 旋轉後可直接 break!
+    // 以下是差值為 0 的處理 (0-child violation)
+    struct rb_node *sibling = wavl_sibling(node);
+
+    // 【第一招：Promote】 (對應圖片第一排)
+    if (wavl_rank_diff(parent, sibling) == 1) {
+        wavl_promote(parent); // 爸爸 Rank + 1 (如果是存 Parity 就 XOR 1)
+        node = parent;        // 違規可能上傳，往上爬繼續 while
+        continue;
+    }
+
+    // 【準備旋轉】(因為 sibling diff == 2)
+    // 判斷是 LL 型還是 LR 型，決定用單旋還是雙旋
+    if ( node 是 parent 的左小孩 ) {
+        if ( node 的左小孩 rank diff == 1 ) {
+            // 【第二招：單旋轉】
+            // ... 執行右旋，調 Rank ...
         } else {
-            sibling = parent->rb_left;
-            // TODO: WAVL 插入邏輯 (右側，與左側完全對稱)
+            // 【第三招：雙旋轉】
+            // ... 執行左旋再右旋，調 Rank ...
         }
-        
-        break; // 開發初期先 break，避免無窮迴圈當機
+    } else {
+        // ... 對稱的右半邊邏輯 ...
+    }
+    
+    // 旋轉完必定完全平衡，直接跳出迴圈！
+    break; 
     }
 }
 EXPORT_SYMBOL(wavl_insert_color);
