@@ -27,36 +27,42 @@ static inline unsigned long wavl_rank_diff(struct rb_node *parent, struct rb_nod
     unsigned long c_parity = child ? wavl_parity(child) : 1UL; 
     return (p_parity != c_parity) ? 1UL : 2UL;
 }
-
+static inline void wavl_change_child(struct rb_node *old, struct rb_node *new,struct rb_node *parent, struct rb_root *root)
+{
+	if (parent) {
+		if (parent->rb_left == old)
+			WRITE_ONCE(parent->rb_left, new);
+		else
+			WRITE_ONCE(parent->rb_right, new);
+	} else
+		WRITE_ONCE(root->rb_node, new);
+}
+static inline void wavl_set_parent(struct rb_node *node,struct rb_node *parent){
+    node->__rb_parent_color = ((unsigned long )parent& WAVL_PARENT_MASK)|wavl_parity(node);
+}
 static void wavl_rotate_left(struct rb_node *node, struct rb_root *root) {
     struct rb_node *right = node->rb_right;
     struct rb_node *parent = wavl_parent(node);
-
-    // 1. 處理 node 與 right 的子節點交換
     if ((node->rb_right = right->rb_left))
-        wavl_set_parent_rank(right->rb_left, node, wavl_rank_diff(right->rb_left));
-    right->rb_left = node;
-
-    // 2. 處理 parent 指標的更新
-    wavl_set_parent_rank(right, parent, wavl_rank_diff(right)); // right 接替 node 的位置
-    if (parent) {
-        if (node == parent->rb_left)
-            parent->rb_left = right;
-        else
-            parent->rb_right = right;
-    } else {
-        root->rb_node = right;
-    }
-    
-    // 3. 處理 node 被降級到 right 下方的狀態
-    wavl_set_parent_rank(node, right, wavl_rank_diff(node));
+        wavl_set_parent(right->rb_left, node);
+    wavl_set_parent(right,parent);
+    wavl_change_child(node,right,parent,root);
+    WRITE_ONCE(right->rb_left,node);
+    wavl_set_parent(node,right);
 }
 
 static void wavl_rotate_right(struct rb_node *node, struct rb_root *root) {
-    // TODO: 參考左旋邏輯，實作對稱的右旋
+    struct rb_node *left = node->rb_left;
+    struct rb_node *parent = wavl_parent(node);
+    if ((node->rb_left = left->rb_right))
+        wavl_set_parent(left->rb_right, node);
+    wavl_set_parent(left,parent);
+    wavl_change_child(node,left,parent,root);
+    WRITE_ONCE(left->rb_right,node);
+    wavl_set_parent(node,left);
 }
 
-// 純 BST 的插入節點 (直接從 lib/rbtree.c 抄過來，把 rb_parent 換成 wavl_parent 即可)
+
 void wavl_link_node(struct rb_node *node, struct rb_node *parent, struct rb_node **rb_link) {
     node->__rb_parent_color = (unsigned long)parent; // 初始 Rank 差值設為 0
     node->rb_left = node->rb_right = NULL;
@@ -64,13 +70,14 @@ void wavl_link_node(struct rb_node *node, struct rb_node *parent, struct rb_node
 }
 EXPORT_SYMBOL(wavl_link_node);
 
-/* ==========================================================
- * 戰區三：你的主戰場 (WAVL Rebalancing)
- * ========================================================== */
 
-// 插入後的重新平衡：處理 0-1 違規
+
+
 void wavl_insert_color(struct rb_node *node, struct rb_root *root) {
-    struct rb_node *parent, *sibling;
+    struct rb_node *parent = rb_red_parent(node), *gparent, *tmp;
+    if (unlikely(!parent)) {
+			break;
+		}
 
     // 新插入的節點預設與 parent 的 rank 差值為 0 (產生 0-1 違規)
     wavl_set_rank_diff(node, 0); 
