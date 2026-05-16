@@ -63,19 +63,11 @@ static void wavl_rotate_right(struct rb_node *node, struct rb_root *root) {
 }
 
 
-void wavl_link_node(struct rb_node *node, struct rb_node *parent, struct rb_node **rb_link) {
-    node->__rb_parent_color = (unsigned long)parent; // 初始 Rank 差值設為 0
-    node->rb_left = node->rb_right = NULL;
-    *rb_link = node;
-}
-EXPORT_SYMBOL(wavl_link_node);
 
-
-
-
-void wavl_insert_color(struct rb_node *node, struct rb_root *root) {
-    struct rb_node *parent = rb_red_parent(node), *gparent, *sibling;
+static __always_inline void wavl_insert_color(struct rb_node *node, struct rb_root *root) {
+    struct rb_node *parent, *gparent, *sibling;
     while(true){
+        parent = wavl_parent(node);
         if (unlikely(!parent)) {
 			break;
 		}
@@ -84,22 +76,39 @@ void wavl_insert_color(struct rb_node *node, struct rb_root *root) {
         gparent=wavl_parent(parent);
         if(node==parent->rb_left){ //node on left
             sibling=parent->rb_right;
-            if(wavl_rank_diff(sibling)==1){
+            if(wavl_rank_diff(parent, sibling)==1){
                 // 0,1 case go promote
                 wavl_flip_parity(parent);
                 node=parent;
-                parent=gparent;
                 continue;
+            }
+            else if(!(node->rb_right)||wavl_rank_diff(node,node->rb_right)==2){ //rotate
+                wavl_rotate_right(parent,root); //rotate  
+                wavl_flip_parity(parent);  //demote z
+                /*
+                 *       parent(z)
+                 *      /      \
+                 *    node      C
+                 *   /   \
+                 *  A     B
+                 * 
+                 * 
+                */
+               break; //tree is balanced
             }
         }
         else{   //node on right
             sibling=parent->rb_left;
-            if(wavl_rank_diff(sibling)==1){
+            if(wavl_rank_diff(parent, sibling)==1){
                 // 0,1 case go promote
                 wavl_flip_parity(parent);
                 node=parent;
-                parent=gparent;
                 continue;
+            }
+            else if(!(node->rb_left)||wavl_rank_diff(node,node->rb_left)==2){  //rotate
+                wavl_rotate_left(parent,root); //rotate 
+                wavl_flip_parity(parent);  //demote z
+                break; //tree is balanced
             }
         }
     }
