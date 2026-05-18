@@ -1,9 +1,8 @@
 
-MODULE_NAME := wavl_module
-obj-m := $(MODULE_NAME).o
+obj-m += wavl_tree_mod.o
 
 
-$(MODULE_NAME)-y := wavl_tree.o wavl_test.o
+wavl_tree_mod-objs := wavltree.c wavl_test.c
 
 
 KDIR := /lib/modules/$(shell uname -r)/build
