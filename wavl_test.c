@@ -96,7 +96,7 @@ static int __init wavl_test_init(void) {
     }
     print_tree_inorder(&my_tree);
     //---------------------------------------------------------------------
-    pr_info("[Test 4] Duplicate Key Policy Test: Insert ten '99's...\n");
+    pr_info("[Test 4] Duplicate Key Policy Test...\n");
     my_tree = RB_ROOT; 
 
     for (i = 0; i < TEST_NODES_COUNT; i++) {
