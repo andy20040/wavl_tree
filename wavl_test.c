@@ -80,35 +80,17 @@ static int __init wavl_test_init(void) {
     }
     print_tree_inorder(&my_tree);
 
-    //--------------------------------------------------------------------
-    pr_info("[Test 3] Random insert %d diffrent numbers...\n", TEST_NODES_COUNT);
-    my_tree = RB_ROOT; 
-    inserted = 0;      // nums of insertion
-    
-    // get rid of the duplicate number 
-    while (inserted < TEST_NODES_COUNT) {
-        rand_val = get_random_u32() % 100;
-        
-        test_nodes[inserted].key = rand_val;
-        
-        if (my_wavl_insert(&my_tree, &test_nodes[inserted]) == 0) 
-            inserted++;     
-    }
-    print_tree_inorder(&my_tree);
-    //---------------------------------------------------------------------
-    pr_info("[Test 4] Duplicate Key Policy Test...\n");
-    my_tree = RB_ROOT; 
 
+    //---------------------------------------------------------------------
+    pr_info("[Test 3] Randomly insert servral key (Contain Duplicate Key) ...\n");
+    my_tree = RB_ROOT; 
     for (i = 0; i < TEST_NODES_COUNT; i++) {
         rand_val = get_random_u32() % 10; 
         test_nodes[i].key = rand_val;
         my_wavl_insert(&my_tree, &test_nodes[i]);
     }
     print_tree_inorder(&my_tree);
-
-    pr_info("===================================\n");
     pr_info("Tests Ended\n");
-    pr_info("===================================\n");
     return 0; 
 }
 
