@@ -49,7 +49,7 @@ static void print_tree_inorder(struct rb_root *root) {
 
     for (node = rb_first(root); node; node = rb_next(node)) {
         struct my_wavl_node *my_node = container_of(node, struct my_wavl_node, node);
-        pr_info("  Key = %d\n", ++count, my_node->key);
+        pr_info("  Key = %d\n", my_node->key);
     }
     pr_info("=====================================\n");
 }
