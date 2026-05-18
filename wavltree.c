@@ -71,7 +71,7 @@ void wavl_insert_color(struct rb_node *node, struct rb_root *root) {
         if (unlikely(!parent)) {
 			break;
 		}
-        if (wavl_rank_diff(parent, node) != 0) //check 0-violation
+        if (wavl_parity(parent) != wavl_parity(node)) //check 0 violation
         break;
         if(node==parent->rb_left){ //node on left
             sibling=parent->rb_right;
