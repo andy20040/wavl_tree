@@ -64,7 +64,7 @@ static void wavl_rotate_right(struct rb_node *node, struct rb_root *root) {
 
 
 
-static __always_inline void wavl_insert_color(struct rb_node *node, struct rb_root *root) {
+void wavl_insert_color(struct rb_node *node, struct rb_root *root) {
     struct rb_node *parent, *sibling;
     while(true){
         parent = wavl_parent(node);
