@@ -2,7 +2,7 @@
 obj-m += wavl_tree_mod.o
 
 
-wavl_tree_mod-objs := wavltree.c wavl_test.c
+wavl_tree_mod-objs := wavltree.o wavl_test.o
 
 
 KDIR := /lib/modules/$(shell uname -r)/build
