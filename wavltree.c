@@ -65,7 +65,7 @@ static void wavl_rotate_right(struct rb_node *node, struct rb_root *root) {
 
 
 static __always_inline void wavl_insert_color(struct rb_node *node, struct rb_root *root) {
-    struct rb_node *parent, *gparent, *sibling;
+    struct rb_node *parent, *sibling;
     while(true){
         parent = wavl_parent(node);
         if (unlikely(!parent)) {
@@ -73,7 +73,6 @@ static __always_inline void wavl_insert_color(struct rb_node *node, struct rb_ro
 		}
         if (wavl_rank_diff(parent, node) != 0) //check 0-violation
         break;
-        gparent=wavl_parent(parent);
         if(node==parent->rb_left){ //node on left
             sibling=parent->rb_right;
             if(wavl_rank_diff(parent, sibling)==1){
@@ -82,19 +81,37 @@ static __always_inline void wavl_insert_color(struct rb_node *node, struct rb_ro
                 node=parent;
                 continue;
             }
-            else if(!(node->rb_right)||wavl_rank_diff(node,node->rb_right)==2){ //rotate
+            else if(!(node->rb_right)||wavl_rank_diff(node,node->rb_right)==2){ //single rotate
                 wavl_rotate_right(parent,root); //rotate  
                 wavl_flip_parity(parent);  //demote z
                 /*
                  *       parent(z)
-                 *      /      \
+                 *      /0     \2
                  *    node      C
-                 *   /   \
+                 *   /   \2
                  *  A     B
                  * 
                  * 
                 */
                break; //tree is balanced
+            }
+            else { //double rotate
+                struct rb_node *y = node->rb_right;
+                wavl_rotate_left(node,root);
+                wavl_rotate_right(parent,root);
+                /*
+                 *       parent(z)                 parent(z)                        y
+                 *      /0      \2                /        \                    /       \
+                 *    node(x)    D    ==>        y          D    ==>          node(x)    z
+                 *   /    \1                   /   \                         /   \     /   \
+                 *  A      y                 node   C                       A     B   C     D
+                 *       /   \              /    \
+                 *      B     C            A      B
+                */
+                wavl_flip_parity(y); //promote y
+                wavl_flip_parity(node);//demote x
+                wavl_flip_parity(parent); //demot z 
+                break; //tree is balanced
             }
         }
         else{   //node on right
@@ -105,18 +122,21 @@ static __always_inline void wavl_insert_color(struct rb_node *node, struct rb_ro
                 node=parent;
                 continue;
             }
-            else if(!(node->rb_left)||wavl_rank_diff(node,node->rb_left)==2){  //rotate
+            else if(!(node->rb_left)||wavl_rank_diff(node,node->rb_left)==2){  //single rotate
                 wavl_rotate_left(parent,root); //rotate 
                 wavl_flip_parity(parent);  //demote z
+                break; //tree is balanced
+            }
+            else { //double rotate
+                struct rb_node *y = node->rb_left;
+                wavl_rotate_right(node,root);
+                wavl_rotate_left(parent,root);
+                wavl_flip_parity(y); //promote y
+                wavl_flip_parity(node);//demote x
+                wavl_flip_parity(parent); //demot z 
                 break; //tree is balanced
             }
         }
     }
 }
 EXPORT_SYMBOL(wavl_insert_color);
-
-// 刪除後的重新平衡：處理 3-1 或 2-2 違規
-void wavl_erase(struct rb_node *node, struct rb_root *root) {
-    // TODO: WAVL 的刪除與 Rank Demotion 邏輯 (這是最難的部分，建議最後寫)
-}
-EXPORT_SYMBOL(wavl_erase);
