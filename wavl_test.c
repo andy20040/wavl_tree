@@ -90,12 +90,11 @@ static int __init wavl_test_init(void) {
         my_wavl_insert(&my_tree, &test_nodes[i]);
     }
     print_tree_inorder(&my_tree);
-    pr_info("Tests Ended\n");
     return 0; 
 }
 
 static void __exit wavl_test_exit(void) {
-    pr_info("WAVL Tree Test: 模組卸載完畢。\n");
+    pr_info("WAVL Tree Test Ended。\n");
 }
 
 module_init(wavl_test_init);
