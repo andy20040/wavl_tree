@@ -106,7 +106,9 @@ void wavl_insert_color(struct rb_node *node, struct rb_root *root) {
 EXPORT_SYMBOL(wavl_insert_color);
 static const struct wavl_augment_callbacks dummy_callbacks = { NULL, NULL, NULL };
 static void dummy_rotate(struct rb_node *old, struct rb_node *new) {}
-
+void ____wavl_erase_color(struct rb_node *rebalance_node, struct rb_root *root, void (*augment_rotate)(struct rb_node *old, struct rb_node *new)) {
+    
+}
 
 void wavl_erase(struct rb_node *node, struct rb_root *root)
 {
@@ -115,7 +117,5 @@ void wavl_erase(struct rb_node *node, struct rb_root *root)
 	if (rebalance)
 		____wavl_erase_color(rebalance, root, dummy_rotate);
 }
-void ____wavl_erase_color(struct rb_node *rebalance_node, struct rb_root *root, void (*augment_rotate)(struct rb_node *old, struct rb_node *new)) {
-    
-}
+
 EXPORT_SYMBOL(wavl_erase);

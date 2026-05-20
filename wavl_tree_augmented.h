@@ -30,9 +30,7 @@ wavl_insert_augmented_cached(struct rb_node *node,
     wavl_insert_augmented(node, &root->rb_root, augment);
 }
 
-// ---------------------------------------------------------
-// 🚀 WAVL 基礎 API (2-Bit Modulo 4 版本)
-// ---------------------------------------------------------
+
 
 // 1. 取得 Rank
 static inline unsigned long wavl_rank(struct rb_node *node) {
