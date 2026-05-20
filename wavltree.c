@@ -1,45 +1,9 @@
 #include <linux/module.h>
 #include <linux/rbtree.h> 
+#include "wavl_tree_augmented.h"
 
 
-#define WAVL_PARITY_MASK 1UL       
-#define WAVL_PARENT_MASK ~1UL    
 
-// get node parity
-static inline unsigned long wavl_parity(struct rb_node *node) {
-    return node->__rb_parent_color & WAVL_PARITY_MASK;
-}
-
-// get parent pointer
-static inline struct rb_node *wavl_parent(struct rb_node *node) {
-    return (struct rb_node *)(node->__rb_parent_color & WAVL_PARENT_MASK);
-}
-
-// set parity without changing parent 
-static inline void wavl_set_parity(struct rb_node *node, unsigned long parity) {
-    node->__rb_parent_color = (node->__rb_parent_color & WAVL_PARENT_MASK) | (parity & WAVL_PARITY_MASK);
-}
-static inline void wavl_flip_parity(struct rb_node *node) {
-    node->__rb_parent_color ^= WAVL_PARITY_MASK;
-}
-static inline unsigned long wavl_rank_diff(struct rb_node *parent, struct rb_node *child) {
-    unsigned long p_parity = wavl_parity(parent);
-    unsigned long c_parity = child ? wavl_parity(child) : 1UL; 
-    return (p_parity != c_parity) ? 1UL : 2UL;
-}
-static inline void wavl_change_child(struct rb_node *old, struct rb_node *new,struct rb_node *parent, struct rb_root *root)
-{
-	if (parent) {
-		if (parent->rb_left == old)
-			WRITE_ONCE(parent->rb_left, new);
-		else
-			WRITE_ONCE(parent->rb_right, new);
-	} else
-		WRITE_ONCE(root->rb_node, new);
-}
-static inline void wavl_set_parent(struct rb_node *node,struct rb_node *parent){
-    node->__rb_parent_color = ((unsigned long )parent& WAVL_PARENT_MASK)|wavl_parity(node);
-}
 static void wavl_rotate_left(struct rb_node *node, struct rb_root *root) {
     struct rb_node *right = node->rb_right;
     struct rb_node *parent = wavl_parent(node);
@@ -71,19 +35,19 @@ void wavl_insert_color(struct rb_node *node, struct rb_root *root) {
         if (unlikely(!parent)) {
 			break;
 		}
-        if (wavl_parity(parent) != wavl_parity(node)) //check 0 violation
+        if (wavl_rank_diff(parent, node) != 0) //check 0 violation
         break;
         if(node==parent->rb_left){ //node on left
             sibling=parent->rb_right;
             if(wavl_rank_diff(parent, sibling)==1){
                 // 0,1 case go promote
-                wavl_flip_parity(parent);
+                wavl_promote(parent);
                 node=parent;
                 continue;
             }
             else if(!(node->rb_right)||wavl_rank_diff(node,node->rb_right)==2){ //single rotate
                 wavl_rotate_right(parent,root); //rotate  
-                wavl_flip_parity(parent);  //demote z
+                wavl_demote(parent);  //demote z
                 /*
                  *       parent(z)
                  *      /0     \2
@@ -108,9 +72,9 @@ void wavl_insert_color(struct rb_node *node, struct rb_root *root) {
                  *       /   \              /    \
                  *      B     C            A      B
                 */
-                wavl_flip_parity(y); //promote y
-                wavl_flip_parity(node);//demote x
-                wavl_flip_parity(parent); //demot z 
+                wavl_promote(y);      // promote y
+                wavl_demote(node);    // demote x
+                wavl_demote(parent); // demote z
                 break; //tree is balanced
             }
         }
@@ -118,25 +82,40 @@ void wavl_insert_color(struct rb_node *node, struct rb_root *root) {
             sibling=parent->rb_left;
             if(wavl_rank_diff(parent, sibling)==1){
                 // 0,1 case go promote
-                wavl_flip_parity(parent);
+                wavl_promote(parent);
                 node=parent;
                 continue;
             }
             else if(!(node->rb_left)||wavl_rank_diff(node,node->rb_left)==2){  //single rotate
                 wavl_rotate_left(parent,root); //rotate 
-                wavl_flip_parity(parent);  //demote z
+                wavl_demote(parent);  //demote z
                 break; //tree is balanced
             }
             else { //double rotate
                 struct rb_node *y = node->rb_left;
                 wavl_rotate_right(node,root);
                 wavl_rotate_left(parent,root);
-                wavl_flip_parity(y); //promote y
-                wavl_flip_parity(node);//demote x
-                wavl_flip_parity(parent); //demot z 
+                wavl_promote(y); //promote y
+                wavl_demote(node);//demote x
+                wavl_demote(parent); //demot z 
                 break; //tree is balanced
             }
         }
     }
 }
 EXPORT_SYMBOL(wavl_insert_color);
+static const struct wavl_augment_callbacks dummy_callbacks = { NULL, NULL, NULL };
+static void dummy_rotate(struct rb_node *old, struct rb_node *new) {}
+
+
+void wavl_erase(struct rb_node *node, struct rb_root *root)
+{
+	struct rb_node *rebalance;
+	rebalance = __wavl_erase_augmented(node, root, &dummy_callbacks);
+	if (rebalance)
+		____wavl_erase_color(rebalance, root, dummy_rotate);
+}
+void ____wavl_erase_color(struct rb_node *rebalance_node, struct rb_root *root, void (*augment_rotate)(struct rb_node *old, struct rb_node *new)) {
+    
+}
+EXPORT_SYMBOL(wavl_erase);
