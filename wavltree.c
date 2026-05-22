@@ -2,12 +2,7 @@
 #include <linux/rbtree.h> 
 #include "wavl_tree_augmented.h"
 
-void __wavl_erase_color(struct rb_node *parent, struct rb_root *root,
-	void (*augment_rotate)(struct rb_node *old, struct rb_node *new))
-{
-	____wavl_erase_color(parent, root, augment_rotate);
-}
-EXPORT_SYMBOL(__wavl_erase_color);
+
 
 static void wavl_rotate_left(struct rb_node *node, struct rb_root *root) {
     struct rb_node *right = node->rb_right;
@@ -113,7 +108,7 @@ static const struct wavl_augment_callbacks dummy_callbacks = { NULL, NULL, NULL 
 static void dummy_rotate(struct rb_node *old, struct rb_node *new) {}
 void ____wavl_erase_color(struct rb_node *rebalance_node, struct rb_root *root, void (*augment_rotate)(struct rb_node *old, struct rb_node *new)) {
     struct rb_node *x = rebalance_node; // p(x)
-    struct rb_node *parent, *sibling;
+    struct rb_node  *sibling;
 
     while (true) {
         unsigned long diff_l = wavl_rank_diff(x, x->rb_left);
@@ -223,7 +218,12 @@ void ____wavl_erase_color(struct rb_node *rebalance_node, struct rb_root *root, 
         }
     }
 }
-
+void __wavl_erase_color(struct rb_node *parent, struct rb_root *root,
+	void (*augment_rotate)(struct rb_node *old, struct rb_node *new))
+{
+	____wavl_erase_color(parent, root, augment_rotate);
+}
+EXPORT_SYMBOL(__wavl_erase_color);
 void wavl_erase(struct rb_node *node, struct rb_root *root)
 {
 	struct rb_node *rebalance;
