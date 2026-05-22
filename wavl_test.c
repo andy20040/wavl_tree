@@ -7,8 +7,6 @@
 #include <linux/string.h>
 #include "wavl_tree_augmented.h"
 #define PROC_NAME "wavl_cmd"
-extern void wavl_insert_color(struct rb_node *node, struct rb_root *root);
-extern void wavl_erase(struct rb_node *node, struct rb_root *root);
 static int nodecount=0;
 struct my_wavl_node {
     int key;
@@ -39,7 +37,7 @@ static int my_wavl_insert(struct rb_root *root, struct my_wavl_node *data) {
     }
 
     rb_link_node(&data->node, parent, new);
-    wavl_insert_color(&data->node, root);
+    wavl_insert(&data->node, root);
     data->in_tree = 1;
     nodecount++;
     return 0;

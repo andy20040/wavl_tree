@@ -28,7 +28,7 @@ static void wavl_rotate_right(struct rb_node *node, struct rb_root *root) {
 
 
 
-void wavl_insert_color(struct rb_node *node, struct rb_root *root) {
+static __always_inline void __wavl_insert(struct rb_node *node, struct rb_root *root,void (*augment_rotate)(struct rb_node *old, struct rb_node *new)) {
     struct rb_node *parent, *sibling;
     while(true){
         parent = wavl_parent(node);
@@ -103,10 +103,9 @@ void wavl_insert_color(struct rb_node *node, struct rb_root *root) {
         }
     }
 }
-EXPORT_SYMBOL(wavl_insert_color);
 static const struct wavl_augment_callbacks dummy_callbacks = { NULL, NULL, NULL };
 static void dummy_rotate(struct rb_node *old, struct rb_node *new) {}
-void ____wavl_erase_color(struct rb_node *rebalance_node, struct rb_root *root, void (*augment_rotate)(struct rb_node *old, struct rb_node *new)) {
+static __always_inline void ____wavl_erase(struct rb_node *rebalance_node, struct rb_root *root, void (*augment_rotate)(struct rb_node *old, struct rb_node *new)) {
     struct rb_node *x = rebalance_node; // p(x)
     struct rb_node  *sibling;
 
@@ -218,18 +217,23 @@ void ____wavl_erase_color(struct rb_node *rebalance_node, struct rb_root *root, 
         }
     }
 }
-void __wavl_erase_color(struct rb_node *parent, struct rb_root *root,
+void wavl_insert(struct rb_node *node, struct rb_root *root)
+{
+	__wavl_insert(node, root, dummy_rotate);
+}
+EXPORT_SYMBOL(wavl_insert);
+void __wavl_erase(struct rb_node *parent, struct rb_root *root,
 	void (*augment_rotate)(struct rb_node *old, struct rb_node *new))
 {
-	____wavl_erase_color(parent, root, augment_rotate);
+	____wavl_erase(parent, root, augment_rotate);
 }
-EXPORT_SYMBOL(__wavl_erase_color);
+EXPORT_SYMBOL(__wavl_erase);
 void wavl_erase(struct rb_node *node, struct rb_root *root)
 {
 	struct rb_node *rebalance;
 	rebalance = __wavl_erase_augmented(node, root, &dummy_callbacks);
 	if (rebalance)
-		____wavl_erase_color(rebalance, root, dummy_rotate);
+		____wavl_erase(rebalance, root, dummy_rotate);
 }
 
 EXPORT_SYMBOL(wavl_erase);

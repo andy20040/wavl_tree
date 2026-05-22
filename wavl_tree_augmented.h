@@ -1,6 +1,6 @@
 #ifndef _WAVL_TREE_AUGMENTED_H
 #define _WAVL_TREE_AUGMENTED_H
-#include <linux/rbtree.h>
+#include "wavl_tree.h"
 
 
 #define WAVL_RANK_MASK 3UL       
@@ -12,12 +12,12 @@ struct wavl_augment_callbacks {
     void (*rotate)(struct rb_node *old, struct rb_node *new);
 };
 
-extern void __wavl_insert_color(struct rb_node *node, struct rb_root *root,void (*augment_rotate)(struct rb_node *old, struct rb_node *new));
-extern void __wavl_erase_color(struct rb_node *parent, struct rb_root *root,void (*augment_rotate)(struct rb_node *old, struct rb_node *new));
+extern void __wavl_insert(struct rb_node *node, struct rb_root *root,void (*augment_rotate)(struct rb_node *old, struct rb_node *new));
+extern void __wavl_erase(struct rb_node *parent, struct rb_root *root,void (*augment_rotate)(struct rb_node *old, struct rb_node *new));
 static inline void wavl_insert_augmented(struct rb_node *node, struct rb_root *root,
                       const struct wavl_augment_callbacks *augment)
 {
-    __wavl_insert_color(node, root, augment->rotate);
+    __wavl_insert_(node, root, augment->rotate);
 }
 
 static inline void
@@ -189,6 +189,6 @@ wavl_erase_augmented(struct rb_node *node, struct rb_root *root,
 {
 	struct rb_node *rebalance = __wavl_erase_augmented(node, root, augment);
 	if (rebalance)
-		__wavl_erase_color(rebalance, root, augment->rotate);
+		__wavl_erase(rebalance, root, augment->rotate);
 }
 #endif
