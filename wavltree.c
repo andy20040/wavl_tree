@@ -235,5 +235,4 @@ void wavl_erase(struct rb_node *node, struct rb_root *root)
 	if (rebalance)
 		____wavl_erase(rebalance, root, dummy_rotate);
 }
-
 EXPORT_SYMBOL(wavl_erase);
