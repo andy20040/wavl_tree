@@ -195,6 +195,15 @@ static void run_test(const char *test_type) {
             }
         }
     }
+    else if (strcmp(test_type, "help") == 0) {
+        pr_info("=== WAVL Tree Test Available Instructions ===\n");
+        pr_info("  echo \"seq\"      > /proc/wavl_cmd  (Sequential Insert)\n");
+        pr_info("  echo \"rev\"      > /proc/wavl_cmd  (Reverse Insert)\n");
+        pr_info("  echo \"rand\"     > /proc/wavl_cmd  (Random Insert)\n");
+        pr_info("  echo \"rand_del\" > /proc/wavl_cmd  (Random Delete Test)\n");
+        pr_info("  echo \"mixed\"    > /proc/wavl_cmd  (Mixed Insert/Delete  Test)\n");
+        pr_info("=============================================\n");
+    }
     else {
         pr_info("[ERROR] unknown instruction: %s\n", test_type);
         pr_info("Support auguments: seq, rev, rand\n");
@@ -209,6 +218,7 @@ static void run_test(const char *test_type) {
     if (verify_wavl_properties(&my_tree) != 0) {
         pr_err(">>> WAVL Tree is BROKEN! <<<\n");
     }
+    pr_info("=====================================\n");
 }
 static ssize_t wavl_proc_write(struct file *file, const char __user *ubuf, size_t count, loff_t *ppos) {
     char buf[32]; 
