@@ -12,11 +12,12 @@ struct wavl_augment_callbacks {
     void (*rotate)(struct rb_node *old, struct rb_node *new);
 };
 
+extern void __wavl_insert(struct rb_node *node, struct rb_root *root,void (*augment_rotate)(struct rb_node *old, struct rb_node *new));
 extern void __wavl_erase(struct rb_node *parent, struct rb_root *root,void (*augment_rotate)(struct rb_node *old, struct rb_node *new));
 static inline void wavl_insert_augmented(struct rb_node *node, struct rb_root *root,
                       const struct wavl_augment_callbacks *augment)
 {
-    __wavl_insert(node, root, augment->rotate);
+
 }
 
 static inline void
