@@ -73,28 +73,28 @@ static void run_test(const char *test_type) {
     for (i = 0; i < TEST_NODES_COUNT; i++) {
         test_nodes[i].in_tree = 0;//reset nodes
     }
-    if (strncmp(test_type, "seq", 3) == 0) {
+    if (strcmp(test_type, "seq", 3) == 0) {
         pr_info("[Running] Sequential Insert 1 ~ %d...\n", TEST_NODES_COUNT);
         for (i = 0; i < TEST_NODES_COUNT; i++) {
             test_nodes[i].key = i + 1; 
             my_wavl_insert(&my_tree, &test_nodes[i]);
         }
     } 
-    else if (strncmp(test_type, "rev", 3) == 0) {
+    else if (strcmp(test_type, "rev", 3) == 0) {
         pr_info("[Running] Reverse Insert %d ~ 1...\n", TEST_NODES_COUNT);
         for (i = 0; i < TEST_NODES_COUNT; i++) {
             test_nodes[i].key = TEST_NODES_COUNT - i; 
             my_wavl_insert(&my_tree, &test_nodes[i]);
         }
     } 
-    else if (strncmp(test_type, "rand", 4) == 0) {
+    else if (strcmp(test_type, "rand", 4) == 0) {
         pr_info("[Running] Random Insert...(including duplicate numbers)\n");
         for (i = 0; i < TEST_NODES_COUNT; i++) {
             test_nodes[i].key = get_random_u32() % 10; 
             my_wavl_insert(&my_tree, &test_nodes[i]);
         }
     } 
-    else if (strncmp(test_type, "rand_del", 8) == 0) {
+    else if (strcmp(test_type, "rand_del", 8) == 0) {
         pr_info("[Running] Random Delete Test...insert 1 to %d first\n",TEST_NODES_COUNT);
         //insert 1 to TEST_NODES_COUNT
         for (i = 0; i < TEST_NODES_COUNT; i++) {
@@ -125,7 +125,7 @@ static void run_test(const char *test_type) {
             }
         }
     }
-    else if (strncmp(test_type, "mixed", 5) == 0) {
+    else if (strcmp(test_type, "mixed", 5) == 0) {
         pr_info("[Running] Mixed Insert/Delete  Test...\n"); 
         for (i = 0; i < ACTION_COUNT; i++) {
             int idx = get_random_u32() % TEST_NODES_COUNT;
