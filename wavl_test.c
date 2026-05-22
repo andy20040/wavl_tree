@@ -5,6 +5,7 @@
 #include <linux/proc_fs.h>   
 #include <linux/uaccess.h>   
 #include <linux/string.h>
+#include "wavl_tree_augmented.h"
 #define PROC_NAME "wavl_cmd"
 extern void wavl_insert_color(struct rb_node *node, struct rb_root *root);
 extern void wavl_erase(struct rb_node *node, struct rb_root *root);
@@ -50,16 +51,8 @@ static void my_wavl_erase(struct rb_root *root, struct my_wavl_node *data) {
         nodecount--;
     }
 }
-static void print_root_key(const char *test_name) {
-    if (my_tree.rb_node) {
-        struct my_wavl_node *root_node = container_of(my_tree.rb_node, struct my_wavl_node, node);
-        pr_info("WAVL [%s]:  Root Key is -> %d\n", test_name, root_node->key);
-    }
-}
 static void print_tree_inorder(struct rb_root *root) {
     struct rb_node *node;
-    int count = 0;
-    
     pr_info("=== Inorder Result===\n");
     
 
