@@ -155,6 +155,9 @@ __wavl_erase_augmented(struct rb_node *node, struct rb_root *root,
             if (augment->propagate) augment->propagate(parent, successor);
         }
         //replace and link
+        tmp = node->rb_left; 
+        WRITE_ONCE(successor->rb_left, tmp);//replace's node left subtree
+        wavl_set_parent(tmp, successor);
         struct rb_node *old_parent = wavl_parent(node); 
         wavl_change_child(node, successor, old_parent, root); 
         

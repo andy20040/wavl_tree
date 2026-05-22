@@ -26,7 +26,7 @@ static struct proc_dir_entry *wavl_proc_ent;
 static int my_wavl_insert(struct rb_root *root, struct my_wavl_node *data) {
     struct rb_node **new = &(root->rb_node), *parent = NULL;
     if (data->in_tree) return -1; //if already on tree stop insertion
-    while (*new) {
+    while (*new) { //find place to insert
         struct my_wavl_node *this = container_of(*new, struct my_wavl_node, node);
         parent = *new;
         if (data->key < this->key)
@@ -126,18 +126,17 @@ static void run_test(const char *test_type) {
         }
     }
     else if (strncmp(test_type, "mixed", 5) == 0) {
-        pr_info("[Running] Mixed Insert/Delete Stress Test...\n"); 
+        pr_info("[Running] Mixed Insert/Delete  Test...\n"); 
         for (i = 0; i < ACTION_COUNT; i++) {
             int idx = get_random_u32() % TEST_NODES_COUNT;
-            int op = get_random_u32() % 2; // 0 to Delete, 1 to Insert
-            
-            if (op == 1 && !test_nodes[idx].in_tree) {
+            //reverse action
+            if (!test_nodes[idx].in_tree) {
                 test_nodes[idx].key = get_random_u32() % 100;
-                pr_info("  -> Inserting key %d\n", test_nodes[idx].key);
+                pr_info("  -> [Action %d] Inserting key %d (idx: %d)\n", i+1, test_nodes[idx].key, idx);
                 my_wavl_insert(&my_tree, &test_nodes[idx]);
             } 
-            else if (op == 0 && test_nodes[idx].in_tree) {
-                pr_info("  -> Deleting key %d\n", test_nodes[idx].key);
+            else {
+                pr_info("  -> [Action %d] Deleting key %d (idx: %d)\n", i+1, test_nodes[idx].key, idx);
                 my_wavl_erase(&my_tree, &test_nodes[idx]);
             }
         }

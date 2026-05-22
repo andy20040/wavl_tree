@@ -200,7 +200,7 @@ void ____wavl_erase_color(struct rb_node *rebalance_node, struct rb_root *root, 
             struct rb_node *w = y->rb_left;  
 
             if (wavl_rank_diff(y, w) == 1) {
-                wavl_rotate_right(z, root,);
+                wavl_rotate_right(z, root);
                 wavl_promote(y);      
                 wavl_demote(z);       
                 if (wavl_is_leaf(z)) {
