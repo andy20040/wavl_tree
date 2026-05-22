@@ -1,6 +1,6 @@
 #ifndef _WAVL_TREE_AUGMENTED_H
 #define _WAVL_TREE_AUGMENTED_H
-#include "wavl_tree.h"
+#include "wavltree.h"
 
 
 #define WAVL_RANK_MASK 3UL       
