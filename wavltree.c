@@ -264,7 +264,7 @@ void wavl_replace_node(struct rb_node *victim, struct rb_node *new,
 		wavl_set_parent(victim->rb_left, new);
 	if (victim->rb_right)
 		wavl_set_parent(victim->rb_right, new);
-	__wavl_change_child(victim, new, parent, root);
+	wavl_change_child(victim, new, parent, root);
 }
 
 void wavl_replace_node_rcu(struct rb_node *victim, struct rb_node *new,
