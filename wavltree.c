@@ -251,14 +251,20 @@ void __wavl_insert_augmented(struct rb_node *node, struct rb_root *root,
 }
 EXPORT_SYMBOL(__wavl_insert_augmented);
 
- void wavl_replace_node(struct rb_node *victim, struct rb_node *new_node, struct rb_root *root) {
+void wavl_replace_node(struct rb_node *victim, struct rb_node *new,
+		     struct rb_root *root)
+{
 	struct rb_node *parent = wavl_parent(victim);
-	wavl_change_child(victim, new_node, parent, root);
+
+	/* Copy the pointers/colour from the victim to the replacement */
+	*new = *victim;
+
+	/* Set the surrounding nodes to point to the replacement */
 	if (victim->rb_left)
-		wavl_set_parent(victim->rb_left, new_node);
+		wavl_set_parent(victim->rb_left, new);
 	if (victim->rb_right)
-		wavl_set_parent(victim->rb_right, new_node);
-	new_node->__rb_parent_color = victim->__rb_parent_color;
+		wavl_set_parent(victim->rb_right, new);
+	__wavl_change_child(victim, new, parent, root);
 }
 
 void wavl_replace_node_rcu(struct rb_node *victim, struct rb_node *new,

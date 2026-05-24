@@ -301,6 +301,7 @@ static void run_test(const char *test_type) {
         pr_info("  echo \"rand\"     > /proc/wavl_cmd  (Random Insert)\n");
         pr_info("  echo \"rand_del\" > /proc/wavl_cmd  (Random Delete Test)\n");
         pr_info("  echo \"mixed\"    > /proc/wavl_cmd  (Mixed Insert/Delete  Test)\n");
+        pr_info("  echo \"replace\"    > /proc/wavl_cmd  (replace  Test)\n");
         pr_info("=============================================\n");
         help=1;
     }
