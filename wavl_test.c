@@ -97,47 +97,6 @@ static void print_tree_reverse(struct rb_root *root) {
 }
 
 
-static int verify_wavl_properties(struct rb_root_cached *root) {
-    struct rb_node *node;
-    int count = 0;
-    int error = 0; 
-
-    for (node = rb_first(&root->rb_root); node; node = rb_next(node)) {
-        struct my_wavl_node *my_node = container_of(node, struct my_wavl_node, node);
-        
-        unsigned long diff_l = wavl_rank_diff(node, node->rb_left);
-        unsigned long diff_r = wavl_rank_diff(node, node->rb_right);
-
-        if (node->rb_left && wavl_parent(node->rb_left) != node) {
-            pr_err("[ERROR] Parent mismatch! Key %d left\n", my_node->key);
-            error = 1;
-        }
-        if (node->rb_right && wavl_parent(node->rb_right) != node) {
-            pr_err("[ERROR] Parent mismatch! Key %d right\n", my_node->key);
-            error = 1;
-        }
-
-        if (diff_l != 1 && diff_l != 2) {
-            pr_err("[ERROR] Rank Violation! Key %d left diff is %lu\n", my_node->key, diff_l);
-            error = 1;
-        }
-        if (diff_r != 1 && diff_r != 2) {
-            pr_err("[ERROR] Rank Violation! Key %d right diff is %lu\n", my_node->key, diff_r);
-            error = 1;
-        }
-        count++;
-    }
-
-    if (verify_leftmost(root) != 0) error = 1;
-    verify_augmented_metadata(root->rb_root.rb_node, &error);
-
-    if (error) return -1; 
-
-    pr_info("[OK] WAVL Invariants Verified. Rank, Leftmost, Augmented check passed! (%d nodes)\n", count);
-    return 0;
-}
-
-
 static int verify_leftmost(struct rb_root_cached *root) {
     struct rb_node *curr = root->rb_root.rb_node;
     struct rb_node *true_leftmost = NULL;
@@ -180,14 +139,56 @@ static int verify_augmented_metadata(struct rb_node *node, int *error_flag) {
 
     return true_max;
 }
+static int verify_wavl_properties(struct rb_root_cached *root) {
+    struct rb_node *node;
+    int count = 0;
+    int error = 0; 
+
+    for (node = rb_first(&root->rb_root); node; node = rb_next(node)) {
+        struct my_wavl_node *my_node = container_of(node, struct my_wavl_node, node);
+        
+        unsigned long diff_l = wavl_rank_diff(node, node->rb_left);
+        unsigned long diff_r = wavl_rank_diff(node, node->rb_right);
+
+        if (node->rb_left && wavl_parent(node->rb_left) != node) {
+            pr_err("[ERROR] Parent mismatch! Key %d left\n", my_node->key);
+            error = 1;
+        }
+        if (node->rb_right && wavl_parent(node->rb_right) != node) {
+            pr_err("[ERROR] Parent mismatch! Key %d right\n", my_node->key);
+            error = 1;
+        }
+
+        if (diff_l != 1 && diff_l != 2) {
+            pr_err("[ERROR] Rank Violation! Key %d left diff is %lu\n", my_node->key, diff_l);
+            error = 1;
+        }
+        if (diff_r != 1 && diff_r != 2) {
+            pr_err("[ERROR] Rank Violation! Key %d right diff is %lu\n", my_node->key, diff_r);
+            error = 1;
+        }
+        count++;
+    }
+
+    if (verify_leftmost(root) != 0) error = 1;
+    verify_augmented_metadata(root->rb_root.rb_node, &error);
+
+    if (error) return -1; 
+
+    pr_info("[OK] WAVL Invariants Verified. Rank, Leftmost, Augmented check passed! (%d nodes)\n", count);
+    return 0;
+}
+
+
 
 
 
 
 static void run_test(const char *test_type) {
+    struct my_wavl_node *new_node=NULL;
     int i,insertion_count=0,deletion_count=0,help=0,replace=0;
     nodecount=0;
-    my_tree = RB_ROOT; 
+    my_tree = RB_ROOT_CACHED; 
     for (i = 0; i < TEST_NODES_COUNT; i++) {
         test_nodes[i].in_tree = 0;//reset nodes
     }
@@ -268,7 +269,7 @@ static void run_test(const char *test_type) {
     }
     else if (strcmp(test_type, "replace") == 0) {
         replace=1;
-        struct my_wavl_node *target, *new_node;
+        struct my_wavl_node *target;
         pr_info("[Running] Replace Node Test...\n");
         
         // insert first
@@ -285,7 +286,7 @@ static void run_test(const char *test_type) {
         new_node = kmalloc(sizeof(*new_node), GFP_KERNEL); 
         new_node->key = 999;
         new_node->in_tree = 1;
-        rb_init_node(&new_node->node)//init rb_node empty
+        RB_CLEAR_NODE(&new_node->node);//init rb_node empty
         wavl_replace_node_cached(&target->node, &new_node->node, &my_tree);
         target->in_tree = 0;
         
