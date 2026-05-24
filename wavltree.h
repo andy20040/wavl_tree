@@ -3,7 +3,8 @@
 #define _WAVL_TREE_H
 
 #include <linux/rbtree.h> //
-
+extern void wavl_replace_node(struct rb_node *victim, struct rb_node *new,struct rb_root *root);
+extern void wavl_replace_node_rcu(struct rb_node *victim, struct rb_node *new,struct rb_root *root);
 void wavl_insert(struct rb_node *node, struct rb_root *root);
 void wavl_erase(struct rb_node *node, struct rb_root *root);
 
@@ -15,7 +16,7 @@ static inline void wavl_insert_cached(struct rb_node *node,
 {
 	if (leftmost)
 		root->rb_leftmost = node;
-	wavl_insert_color(node, &root->rb_root);
+	wavl_insert(node, &root->rb_root);
 }
 
 

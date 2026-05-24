@@ -30,7 +30,7 @@ static inline void wavl_insert_augmented_cached(struct rb_node *node,struct rb_r
 static __always_inline struct rb_node *
 wavl_add_augmented_cached(struct rb_node *node, struct rb_root_cached *tree,
 			bool (*less)(struct rb_node *, const struct rb_node *),
-			const struct rb_augment_callbacks *augment)
+			const struct wavl_augment_callbacks *augment)
 {
 	struct rb_node **link = &tree->rb_root.rb_node;
 	struct rb_node *parent = NULL;
@@ -227,7 +227,7 @@ wavl_erase_augmented(struct rb_node *node, struct rb_root *root,
 
 static __always_inline void
 wavl_erase_augmented_cached(struct rb_node *node, struct rb_root_cached *root,
-			  const struct rb_augment_callbacks *augment)
+			  const struct wavl_augment_callbacks *augment)
 {
 	if (root->rb_leftmost == node)
 		root->rb_leftmost = rb_next(node);
@@ -241,7 +241,8 @@ static inline void                                                  \
 WAVLNAME ## _propagate(struct rb_node *rb, struct rb_node *stop)    \
 {                                                                   \
     while (rb != stop) {                                            \
-        WAVLSTRUCT *node = rb_entry(rb, WAVLSTRUCT, WAVLFIELD);     \ 
+        WAVLSTRUCT *node = rb_entry(rb, WAVLSTRUCT, WAVLFIELD);     \
+                 
         if (WAVLCOMPUTE(node, true))                                \
             break;                                                  \
         rb = wavl_parent(&node->WAVLFIELD);                         \
