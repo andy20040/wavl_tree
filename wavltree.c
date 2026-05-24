@@ -4,7 +4,7 @@
 
 
 
-static void wavl_rotate_left(struct rb_node *node, struct rb_root *root) {
+static void wavl_rotate_left(struct rb_node *node, struct rb_root *root, void (*augment_rotate)(struct rb_node *old, struct rb_node *new)) {
     struct rb_node *right = node->rb_right;
     struct rb_node *parent = wavl_parent(node);
     if ((node->rb_right = right->rb_left))
@@ -13,9 +13,10 @@ static void wavl_rotate_left(struct rb_node *node, struct rb_root *root) {
     wavl_change_child(node,right,parent,root);
     WRITE_ONCE(right->rb_left,node);
     wavl_set_parent(node,right);
+    augment_rotate(node, right); //augment fix
 }
 
-static void wavl_rotate_right(struct rb_node *node, struct rb_root *root) {
+static void wavl_rotate_right(struct rb_node *node, struct rb_root *root, void (*augment_rotate)(struct rb_node *old, struct rb_node *new)) {
     struct rb_node *left = node->rb_left;
     struct rb_node *parent = wavl_parent(node);
     if ((node->rb_left = left->rb_right))
@@ -24,6 +25,7 @@ static void wavl_rotate_right(struct rb_node *node, struct rb_root *root) {
     wavl_change_child(node,left,parent,root);
     WRITE_ONCE(left->rb_right,node);
     wavl_set_parent(node,left);
+    augment_rotate(node, left);
 }
 
 
@@ -46,7 +48,7 @@ static __always_inline void __wavl_insert(struct rb_node *node, struct rb_root *
                 continue;
             }
             else if(!(node->rb_right)||wavl_rank_diff(node,node->rb_right)==2){ //single rotate
-                wavl_rotate_right(parent,root); //rotate  
+                wavl_rotate_right(parent,root,augment_rotate); //rotate  
                 wavl_demote(parent);  //demote z
                 /*
                  *       parent(z)
@@ -61,8 +63,8 @@ static __always_inline void __wavl_insert(struct rb_node *node, struct rb_root *
             }
             else { //double rotate
                 struct rb_node *y = node->rb_right;
-                wavl_rotate_left(node,root);
-                wavl_rotate_right(parent,root);
+                wavl_rotate_left(node,root,augment_rotate);
+                wavl_rotate_right(parent,root,augment_rotate);
                 /*
                  *       parent(z)                 parent(z)                        y
                  *      /0      \2                /        \                    /       \
@@ -87,14 +89,14 @@ static __always_inline void __wavl_insert(struct rb_node *node, struct rb_root *
                 continue;
             }
             else if(!(node->rb_left)||wavl_rank_diff(node,node->rb_left)==2){  //single rotate
-                wavl_rotate_left(parent,root); //rotate 
+                wavl_rotate_left(parent,root,augment_rotate); //rotate 
                 wavl_demote(parent);  //demote z
                 break; //tree is balanced
             }
             else { //double rotate
                 struct rb_node *y = node->rb_left;
-                wavl_rotate_right(node,root);
-                wavl_rotate_left(parent,root);
+                wavl_rotate_right(node,root,augment_rotate);
+                wavl_rotate_left(parent,root,augment_rotate);
                 wavl_promote(y); //promote y
                 wavl_demote(node);//demote x
                 wavl_demote(parent); //demot z 
@@ -103,8 +105,14 @@ static __always_inline void __wavl_insert(struct rb_node *node, struct rb_root *
         }
     }
 }
-static const struct wavl_augment_callbacks dummy_callbacks = { NULL, NULL, NULL };
-static void dummy_rotate(struct rb_node *old, struct rb_node *new) {}
+static inline void dummy_propagate(struct rb_node *node, struct rb_node *stop) {}
+static inline void dummy_copy(struct rb_node *old, struct rb_node *new) {}
+static inline void dummy_rotate(struct rb_node *old, struct rb_node *new) {}
+static const struct wavl_augment_callbacks dummy_callbacks = {
+	.propagate = dummy_propagate,
+	.copy = dummy_copy,
+	.rotate = dummy_rotate
+};
 static __always_inline void ____wavl_erase(struct rb_node *rebalance_node, struct rb_root *root, void (*augment_rotate)(struct rb_node *old, struct rb_node *new)) {
     struct rb_node *x = rebalance_node; // p(x)
     struct rb_node  *sibling;
@@ -148,7 +156,7 @@ static __always_inline void ____wavl_erase(struct rb_node *rebalance_node, struc
 
             // Rotate: w is 1-child 
             if (wavl_rank_diff(y, w) == 1) {
-                wavl_rotate_left(z, root);
+                wavl_rotate_left(z, root,augment_rotate);
                 wavl_promote(y);      // promote y
                 wavl_demote(z);       // demote z
                 if (wavl_is_leaf(z)) {
@@ -158,8 +166,8 @@ static __always_inline void ____wavl_erase(struct rb_node *rebalance_node, struc
             }
             // Double Rotate: w is 2-child ( v is 1-child)
             else {
-                wavl_rotate_right(y, root);
-                wavl_rotate_left(z, root);
+                wavl_rotate_right(y, root,augment_rotate);
+                wavl_rotate_left(z, root,augment_rotate);
                 
                 wavl_promote(v);      // promote v
                 wavl_promote(v);      // promote v 
@@ -194,7 +202,7 @@ static __always_inline void ____wavl_erase(struct rb_node *rebalance_node, struc
             struct rb_node *w = y->rb_left;  
 
             if (wavl_rank_diff(y, w) == 1) {
-                wavl_rotate_right(z, root);
+                wavl_rotate_right(z, root,augment_rotate);
                 wavl_promote(y);      
                 wavl_demote(z);       
                 if (wavl_is_leaf(z)) {
@@ -204,8 +212,8 @@ static __always_inline void ____wavl_erase(struct rb_node *rebalance_node, struc
             }
    
             else {
-                wavl_rotate_left(y, root);
-                wavl_rotate_right(z, root);
+                wavl_rotate_left(y, root,augment_rotate);
+                wavl_rotate_right(z, root,augment_rotate);
                 
                 wavl_promote(v);
                 wavl_promote(v);
@@ -236,3 +244,42 @@ void wavl_erase(struct rb_node *node, struct rb_root *root)
 		____wavl_erase(rebalance, root, dummy_rotate);
 }
 EXPORT_SYMBOL(wavl_erase);
+
+void __wavl_insert_augmented(struct rb_node *node, struct rb_root *root,
+	void (*augment_rotate)(struct rb_node *old, struct rb_node *new))
+{
+	__wavl_insert(node, root,augment_rotate);
+}
+EXPORT_SYMBOL(__wavl_insert_augmented);
+
+static inline void wavl_replace_node(struct rb_node *victim, struct rb_node *new_node, struct rb_root *root) {
+	struct rb_node *parent = wavl_parent(victim);
+	wavl_change_child(victim, new_node, parent, root);
+	if (victim->rb_left)
+		wavl_set_parent(victim->rb_left, new_node);
+	if (victim->rb_right)
+		wavl_set_parent(victim->rb_right, new_node);
+	new_node->__rb_parent_color = victim->__rb_parent_color;
+}
+
+void rb_replace_node_rcu(struct rb_node *victim, struct rb_node *new,
+			 struct rb_root *root)
+{
+	struct rb_node *parent = wavl_parent(victim);
+
+	/* Copy the pointers/colour from the victim to the replacement */
+	*new = *victim;
+
+	/* Set the surrounding nodes to point to the replacement */
+	if (victim->rb_left)
+		wavl_set_parent(victim->rb_left, new);
+	if (victim->rb_right)
+		wavl_set_parent(victim->rb_right, new);
+
+	/* Set the parent's pointer to the new node last after an RCU barrier
+	 * so that the pointers onwards are seen to be set correctly when doing
+	 * an RCU walk over the tree.
+	 */
+	__wavl_change_child_rcu(victim, new, parent, root);
+}
+EXPORT_SYMBOL(rb_replace_node_rcu);

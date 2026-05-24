@@ -1,7 +1,7 @@
 #ifndef _WAVL_TREE_AUGMENTED_H
 #define _WAVL_TREE_AUGMENTED_H
 #include "wavltree.h"
-
+#include <linux/rcupdate.h>
 
 #define WAVL_RANK_MASK 3UL       
 #define WAVL_PARENT_MASK ~3UL    
@@ -12,27 +12,51 @@ struct wavl_augment_callbacks {
     void (*rotate)(struct rb_node *old, struct rb_node *new);
 };
 
-
+extern void __wavl_insert_augmented(struct rb_node *node, struct rb_root *root,void (*augment_rotate)(struct rb_node *old, struct rb_node *new));
 extern void __wavl_erase(struct rb_node *parent, struct rb_root *root,void (*augment_rotate)(struct rb_node *old, struct rb_node *new));
 static inline void wavl_insert_augmented(struct rb_node *node, struct rb_root *root,
                       const struct wavl_augment_callbacks *augment)
 {
-
+    __wavl_insert_augmented(node, root, augment->rotate);
 }
 
-static inline void
-wavl_insert_augmented_cached(struct rb_node *node,
-                             struct rb_root_cached *root, bool newleft,
-                             const struct wavl_augment_callbacks *augment)
+static inline void wavl_insert_augmented_cached(struct rb_node *node,struct rb_root_cached *root, bool newleft,const struct wavl_augment_callbacks *augment)
 {
     if (newleft)
         root->rb_leftmost = node;
     wavl_insert_augmented(node, &root->rb_root, augment);
 }
 
+static __always_inline struct rb_node *
+wavl_add_augmented_cached(struct rb_node *node, struct rb_root_cached *tree,
+			bool (*less)(struct rb_node *, const struct rb_node *),
+			const struct rb_augment_callbacks *augment)
+{
+	struct rb_node **link = &tree->rb_root.rb_node;
+	struct rb_node *parent = NULL;
+	bool leftmost = true;
+
+	while (*link) {
+		parent = *link;
+		if (less(node, parent)) {
+			link = &parent->rb_left;
+		} else {
+			link = &parent->rb_right;
+			leftmost = false;
+		}
+	}
+
+	rb_link_node(node, parent, link);
+	augment->propagate(parent, NULL); /* suboptimal */
+	wavl_insert_augmented_cached(node, tree, leftmost, augment);
+
+	return leftmost ? node : NULL;
+}
 
 
-// 1. 取得 Rank
+
+
+
 static inline unsigned long wavl_rank(struct rb_node *node) {
     if (!node) return 3UL; 
     return node->__rb_parent_color & WAVL_RANK_MASK;
@@ -75,19 +99,27 @@ static inline void wavl_change_child(struct rb_node *old, struct rb_node *new, s
 		WRITE_ONCE(root->rb_node, new);
 }
 
+static inline void
+__wavl_change_child_rcu(struct rb_node *old, struct rb_node *new,
+		      struct rb_node *parent, struct rb_root *root)
+{
+	if (parent) {
+		if (parent->rb_left == old)
+			rcu_assign_pointer(parent->rb_left, new);
+		else
+			rcu_assign_pointer(parent->rb_right, new);
+	} else
+		rcu_assign_pointer(root->rb_node, new);
+}
+
+
+
+
 static inline void wavl_set_parent(struct rb_node *node, struct rb_node *parent) {
     node->__rb_parent_color = ((unsigned long)parent & WAVL_PARENT_MASK) | wavl_rank(node);
 }
 
-static inline void wavl_replace_node(struct rb_node *victim, struct rb_node *new_node, struct rb_root *root) {
-	struct rb_node *parent = wavl_parent(victim);
-	wavl_change_child(victim, new_node, parent, root);
-	if (victim->rb_left)
-		wavl_set_parent(victim->rb_left, new_node);
-	if (victim->rb_right)
-		wavl_set_parent(victim->rb_right, new_node);
-	new_node->__rb_parent_color = victim->__rb_parent_color;
-}
+
 
 
 static inline struct rb_node *
@@ -191,4 +223,73 @@ wavl_erase_augmented(struct rb_node *node, struct rb_root *root,
 	if (rebalance)
 		__wavl_erase(rebalance, root, augment->rotate);
 }
+
+
+static inline void wavl_erase_cached(struct rb_node *node, struct rb_root_cached *root)
+{
+    // if delete the min
+	if (root->rb_leftmost == node)
+		root->rb_leftmost = rb_next(node);
+	wavl_erase(node, &root->rb_root);
+}
+
+
+#define WAVL_DECLARE_CALLBACKS(WAVLSTATIC, WAVLNAME,                \
+                 WAVLSTRUCT, WAVLFIELD, WAVLAUGMENTED, WAVLCOMPUTE) \
+static inline void                                                  \
+WAVLNAME ## _propagate(struct rb_node *rb, struct rb_node *stop)    \
+{                                                                   \
+    while (rb != stop) {                                            \
+        WAVLSTRUCT *node = rb_entry(rb, WAVLSTRUCT, WAVLFIELD);     \ 
+        if (WAVLCOMPUTE(node, true))                                \
+            break;                                                  \
+        rb = wavl_parent(&node->WAVLFIELD);                         \
+    }                                                               \
+}                                                                   \
+static inline void                                                  \
+WAVLNAME ## _copy(struct rb_node *rb_old, struct rb_node *rb_new)   \
+{                                                                   \
+    WAVLSTRUCT *old = rb_entry(rb_old, WAVLSTRUCT, WAVLFIELD);      \
+    WAVLSTRUCT *new = rb_entry(rb_new, WAVLSTRUCT, WAVLFIELD);      \
+    new->WAVLAUGMENTED = old->WAVLAUGMENTED;                        \
+}                                                                   \
+static void                                                         \
+WAVLNAME ## _rotate(struct rb_node *rb_old, struct rb_node *rb_new) \
+{                                                                   \
+    WAVLSTRUCT *old = rb_entry(rb_old, WAVLSTRUCT, WAVLFIELD);      \
+    WAVLSTRUCT *new = rb_entry(rb_new, WAVLSTRUCT, WAVLFIELD);      \
+    new->WAVLAUGMENTED = old->WAVLAUGMENTED;                        \
+    WAVLCOMPUTE(old, false);                                        \
+}                                                                   \
+WAVLSTATIC const struct wavl_augment_callbacks WAVLNAME = {         \
+    .propagate = WAVLNAME ## _propagate,                            \
+    .copy = WAVLNAME ## _copy,                                      \
+    .rotate = WAVLNAME ## _rotate                                   \
+};
+//find max augment
+#define WAVL_DECLARE_CALLBACKS_MAX(WAVLSTATIC, WAVLNAME, WAVLSTRUCT, WAVLFIELD, \
+				 WAVLTYPE, WAVLAUGMENTED, WAVLCOMPUTE)	      \
+static inline bool WAVLNAME ## _compute_max(WAVLSTRUCT *node, bool exit)      \
+{									      \
+	WAVLSTRUCT *child;						      \
+	WAVLTYPE max = WAVLCOMPUTE(node);				      \
+	if (node->WAVLFIELD.rb_left) {					      \
+		child = rb_entry(node->WAVLFIELD.rb_left, WAVLSTRUCT, WAVLFIELD);   \
+		if (child->WAVLAUGMENTED > max)				      \
+			max = child->WAVLAUGMENTED;			      \
+	}								      \
+	if (node->WAVLFIELD.rb_right) {					      \
+		child = rb_entry(node->WAVLFIELD.rb_right, WAVLSTRUCT, WAVLFIELD);  \
+		if (child->WAVLAUGMENTED > max)				      \
+			max = child->WAVLAUGMENTED;			      \
+	}								      \
+	if (exit && node->WAVLAUGMENTED == max)				      \
+		return true;						      \
+	node->WAVLAUGMENTED = max;					      \
+	return false;							      \
+}									      \
+WAVL_DECLARE_CALLBACKS(WAVLSTATIC, WAVLNAME,				      \
+		     WAVLSTRUCT, WAVLFIELD, WAVLAUGMENTED, WAVLNAME ## _compute_max)
+
+
 #endif

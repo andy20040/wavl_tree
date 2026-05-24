@@ -217,8 +217,9 @@ static void run_test(const char *test_type) {
         if (verify_wavl_properties(&my_tree) != 0) {
             pr_err(">>> WAVL Tree is BROKEN! <<<\n");
         }
-    }
         pr_info("=====================================\n");
+    }
+
 }
 static ssize_t wavl_proc_write(struct file *file, const char __user *ubuf, size_t count, loff_t *ppos) {
     char buf[32]; 
