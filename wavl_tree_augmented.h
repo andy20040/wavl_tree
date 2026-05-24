@@ -242,7 +242,6 @@ WAVLNAME ## _propagate(struct rb_node *rb, struct rb_node *stop)    \
 {                                                                   \
     while (rb != stop) {                                            \
         WAVLSTRUCT *node = rb_entry(rb, WAVLSTRUCT, WAVLFIELD);     \
-                 
         if (WAVLCOMPUTE(node, true))                                \
             break;                                                  \
         rb = wavl_parent(&node->WAVLFIELD);                         \
