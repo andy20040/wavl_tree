@@ -225,7 +225,7 @@ static __always_inline void ____wavl_erase(struct rb_node *rebalance_node, struc
         }
     }
 }
-void wavl_insert(struct rb_node *node, struct rb_root *root,void (*augment_rotate)(struct rb_node *old, struct rb_node *new))
+void wavl_insert(struct rb_node *node, struct rb_root *root)
 {
 	__wavl_insert(node, root, dummy_rotate);
 }
