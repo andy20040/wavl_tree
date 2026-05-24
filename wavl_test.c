@@ -16,6 +16,14 @@ struct my_wavl_node {
 
 struct rb_root my_tree = RB_ROOT;
 
+
+static inline bool my_wavl_less(struct rb_node *node_new, const struct rb_node *node_parent)
+{
+    struct my_wavl_node *n = container_of(node_new, struct my_wavl_node, node);
+    struct my_wavl_node *p = container_of(node_parent, struct my_wavl_node, node);
+    
+    return n->key < p->key; 
+}
 #define TEST_NODES_COUNT 20  //total node to insert
 #define DELETE_NODES_COUNT 10 //total node to delete
 #define ACTION_COUNT 50 //total actions for mixed
@@ -23,21 +31,9 @@ static struct my_wavl_node test_nodes[TEST_NODES_COUNT];
 static struct proc_dir_entry *wavl_proc_ent;
 
 static int my_wavl_insert(struct rb_root *root, struct my_wavl_node *data) {
-    struct rb_node **new = &(root->rb_node), *parent = NULL;
-    if (data->in_tree) return -1; //if already on tree stop insertion
-    while (*new) { //find place to insert
-        struct my_wavl_node *this = container_of(*new, struct my_wavl_node, node);
-        parent = *new;
-        if (data->key < this->key)
-            new = &((*new)->rb_left);
-        else if (data->key > this->key)
-            new = &((*new)->rb_right);
-        else
-            new = &((*new)->rb_right);//same key
-    }
-
-    rb_link_node(&data->node, parent, new);
-    wavl_insert(&data->node, root);
+    //if in tree dont insert
+    if (data->in_tree) return -1; 
+    wavl_add(&data->node, root, my_wavl_less);
     data->in_tree = 1;
     nodecount++;
     return 0;
