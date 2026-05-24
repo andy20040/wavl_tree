@@ -55,6 +55,7 @@ static int my_wavl_insert(struct rb_root_cached *root, struct my_wavl_node *data
             leftmost = false;
         }
     }
+    data->subtree_max = data->key;
     rb_link_node(&data->node, parent, link);
     if (parent) {
         my_aug_callbacks.propagate(parent, NULL);
