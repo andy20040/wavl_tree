@@ -225,12 +225,13 @@ wavl_erase_augmented(struct rb_node *node, struct rb_root *root,
 }
 
 
-static inline void wavl_erase_cached(struct rb_node *node, struct rb_root_cached *root)
+static __always_inline void
+wavl_erase_augmented_cached(struct rb_node *node, struct rb_root_cached *root,
+			  const struct rb_augment_callbacks *augment)
 {
-    // if delete the min
 	if (root->rb_leftmost == node)
 		root->rb_leftmost = rb_next(node);
-	wavl_erase(node, &root->rb_root);
+	wavl_erase_augmented(node, &root->rb_root, augment);
 }
 
 
