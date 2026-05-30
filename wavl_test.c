@@ -316,6 +316,7 @@ static void run_test(const char *test_type) {
     struct my_wavl_node *new_node=NULL;
     int i,insertion_count=0,deletion_count=0,help=0,replace=0,aug=0;
     if (strcmp(test_type, "seq") == 0) {
+        my_tree = RB_ROOT_CACHED;
         aug=0;
         pr_info("[Running] Sequential Insert 1 ~ %d...\n", TEST_NODES_COUNT);
         nodecount=0;
@@ -329,6 +330,7 @@ static void run_test(const char *test_type) {
         }
     } 
     else if (strcmp(test_type, "rev") == 0) {
+        my_tree = RB_ROOT_CACHED;
         aug=0;
         nodecount=0;
         for (i = 0; i < TEST_NODES_COUNT; i++) {
@@ -342,6 +344,7 @@ static void run_test(const char *test_type) {
         }
     } 
     else if (strcmp(test_type, "rand") == 0) {
+        my_tree = RB_ROOT_CACHED;
         nodecount=0;
         aug=0;
         for (i = 0; i < TEST_NODES_COUNT; i++) {
@@ -355,6 +358,7 @@ static void run_test(const char *test_type) {
         }
     } 
     else if (strcmp(test_type, "rand_del") == 0) {
+        my_tree = RB_ROOT_CACHED;
         nodecount=0;
         aug=0;
         for (i = 0; i < TEST_NODES_COUNT; i++) {
@@ -393,6 +397,7 @@ static void run_test(const char *test_type) {
         }
     }
     else if (strcmp(test_type, "mixed") == 0) {
+        my_tree = RB_ROOT_CACHED;
         nodecount=0;
         aug=0;
         for (i = 0; i < TEST_NODES_COUNT; i++) {
@@ -416,10 +421,11 @@ static void run_test(const char *test_type) {
         }
     }
     else if (strcmp(test_type, "replace") == 0) {
+        my_tree = RB_ROOT_CACHED;
         nodecount=0;
         aug=0;
         for (i = 0; i < TEST_NODES_COUNT; i++) {
-            test_nodes[i].in_tree = 0;//reset nodes
+            test_nodes[i].in_tree = 0;//reset nodes and tree
         }
         replace=1;
         struct my_wavl_node *target;
@@ -467,38 +473,34 @@ static void run_test(const char *test_type) {
                 pr_err(">>> Interval WAVL Tree is BROKEN! <<<\n");
             }
         }
-        else if (strncmp(test_type, "int_search", 10) == 0) {
-            aug=1;
-            // "int_search <start> <end>"
-            if(RB_EMPTY_ROOT(&my_interval_tree.rb_root)){
-                pr_info("Tree is empty insert first ! (use int_rand to random insert)");
-                return;
-            }
-            if (sscanf(test_type, "int_search %lu %lu", &q_start, &q_end) == 2) {
-                    if (q_start > q_end) {
-                        pr_err("[ERROR] Invalid interval: start (%lu) > end (%lu)\n", q_start, q_end);
-                        return;
-                    }
-                    pr_info("[Running] Interval Tree Search for [%lu, %lu]...\n", q_start, q_end); 
-                    if (verify_interval_wavl_properties(&my_interval_tree) != 0) {
-                        pr_err(">>> Interval WAVL Tree is BROKEN! <<<\n");
-                    }
-                    struct my_wavl_interval_node *found = interval_search(&my_interval_tree, q_start, q_end);
-                    if (found) {
-                        pr_info("  -> [Search SUCCESS] Target [%lu, %lu] overlays with found interval [%lu, %lu]\n", 
-                                q_start, q_end, found->start, found->end);
-                    } else {
-                        pr_info("  -> [Search FAIL] No interval overlays with [%lu, %lu]\n", q_start, q_end);
-                    }
-            } 
-            else {
-                pr_err("[ERROR] Invalid command format. Usage: echo \"int_search <start> <end>\" > /proc/wavl_cmd\n");
-            }
+    else if (strncmp(test_type, "int_search", 10) == 0) {
+        aug=1;
+        // "int_search <start> <end>"
+        if(RB_EMPTY_ROOT(&my_interval_tree.rb_root)){
+            pr_info("Tree is empty insert first ! (use int_rand to random insert)");
+            return;
+        }
+        if (sscanf(test_type, "int_search %lu %lu", &q_start, &q_end) == 2) {
+                if (q_start > q_end) {
+                    pr_err("[ERROR] Invalid interval: start (%lu) > end (%lu)\n", q_start, q_end);
+                    return;
+                }
+                pr_info("[Running] Interval Tree Search for [%lu, %lu]...\n", q_start, q_end); 
+                if (verify_interval_wavl_properties(&my_interval_tree) != 0) {
+                    pr_err(">>> Interval WAVL Tree is BROKEN! <<<\n");
+                }
+                struct my_wavl_interval_node *found = interval_search(&my_interval_tree, q_start, q_end);
+                if (found) {
+                    pr_info("  -> [Search SUCCESS] Target [%lu, %lu] overlays with found interval [%lu, %lu]\n", 
+                            q_start, q_end, found->start, found->end);
+                } else {
+                    pr_info("  -> [Search FAIL] No interval overlays with [%lu, %lu]\n", q_start, q_end);
+                }
+        } 
+        else {
+            pr_err("[ERROR] Invalid command format. Usage: echo \"int_search <start> <end>\" > /proc/wavl_cmd\n");
+        }
     }
-
-
-
-
     else if (strcmp(test_type, "help") == 0) {
         pr_info("=== WAVL Tree Test Available Instructions ===\n");
         pr_info("  echo \"seq\"      > /proc/wavl_cmd  (Sequential Insert)\n");
