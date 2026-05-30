@@ -97,7 +97,7 @@ static void my_wavl_erase(struct rb_root_cached *root, struct my_wavl_node *data
     if (data->in_tree) {
         if (root->rb_leftmost == &data->node)
             root->rb_leftmost = rb_next(&data->node);
-        wavl_erase_cached(&data->node, &root->rb_root);
+        wavl_erase_cached(&data->node, root);
         data->in_tree = 0;
         nodecount--;
     }
@@ -138,7 +138,7 @@ static void interval_wavl_erase(struct rb_root_cached *root, struct my_wavl_inte
     if (data->in_tree) {
         if (root->rb_leftmost == &data->node)
             root->rb_leftmost = rb_next(&data->node);
-        wavl_erase_augmented_cached(&data->node, &root->rb_root,&my_aug_callbacks);
+        wavl_erase_augmented_cached(&data->node, root,&my_aug_callbacks);
         data->in_tree = 0;
         nodecount--;
     }
@@ -151,7 +151,7 @@ static struct my_wavl_interval_node *interval_search(struct rb_root_cached *root
         if(query_end >= m->start && m->end >= query_start)
             return m;   //overlay
         if(node->rb_left){
-            struct my_wavl_interval_node *left=container_of(node->left,struct my_wavl_interval_node,node);
+            struct my_wavl_interval_node *left=container_of(node->rb_left,struct my_wavl_interval_node,node);
             if(left->subtree_max_end >=query_start){ //may overlay
                 node=node->rb_left;
                 continue;
@@ -316,7 +316,7 @@ static void run_test(const char *test_type) {
     struct my_wavl_node *new_node=NULL;
     int i,insertion_count=0,deletion_count=0,help=0,replace=0,aug=0;
     if (strcmp(test_type, "seq") == 0) {
-        aug=0
+        aug=0;
         pr_info("[Running] Sequential Insert 1 ~ %d...\n", TEST_NODES_COUNT);
         nodecount=0;
         for (i = 0; i < TEST_NODES_COUNT; i++) {
@@ -329,7 +329,7 @@ static void run_test(const char *test_type) {
         }
     } 
     else if (strcmp(test_type, "rev") == 0) {
-        aug=0
+        aug=0;
         nodecount=0;
         for (i = 0; i < TEST_NODES_COUNT; i++) {
             test_nodes[i].in_tree = 0;//reset nodes
@@ -343,7 +343,7 @@ static void run_test(const char *test_type) {
     } 
     else if (strcmp(test_type, "rand") == 0) {
         nodecount=0;
-        aug=0
+        aug=0;
         for (i = 0; i < TEST_NODES_COUNT; i++) {
             test_nodes[i].in_tree = 0;//reset nodes
         }
@@ -356,7 +356,7 @@ static void run_test(const char *test_type) {
     } 
     else if (strcmp(test_type, "rand_del") == 0) {
         nodecount=0;
-        aug=0
+        aug=0;
         for (i = 0; i < TEST_NODES_COUNT; i++) {
             test_nodes[i].in_tree = 0;//reset nodes
         }
@@ -394,7 +394,7 @@ static void run_test(const char *test_type) {
     }
     else if (strcmp(test_type, "mixed") == 0) {
         nodecount=0;
-        aug=0
+        aug=0;
         for (i = 0; i < TEST_NODES_COUNT; i++) {
             test_nodes[i].in_tree = 0;//reset nodes
         }
