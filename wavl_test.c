@@ -448,9 +448,6 @@ static void run_test(const char *test_type) {
         RB_CLEAR_NODE(&new_node->node);//init rb_node empty
         wavl_replace_node_cached(&target->node, &new_node->node, &my_tree);
         target->in_tree = 0;
-        
-        my_aug_callbacks.copy(&target->node, &new_node->node); // copy subtree_max to new node
-        my_aug_callbacks.propagate(&new_node->node, NULL);     // key changed go propagate
     }
     else if (strcmp(test_type, "int_rand") == 0) {
             aug=1;
