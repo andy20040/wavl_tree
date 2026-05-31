@@ -8,8 +8,6 @@ bpf_source = """
 
 // per cpu array (index 0)
 BPF_PERCPU_ARRAY(insert_counts, u32, 1);
-
-// eBPF 追蹤函式
 int trace_rb_insert_color(struct pt_regs *ctx) {
     u32 key = 0;
     
