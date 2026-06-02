@@ -25,7 +25,7 @@ struct my_wavl_interval_node {
 };
 
 
-
+//--------------------------------------------------WAVL---------------------------------------------------------
 
 static inline bool my_wavl_less(struct rb_node *node_new, const struct rb_node *node_parent)
 {
@@ -161,6 +161,64 @@ static struct my_wavl_interval_node *interval_search(struct rb_root_cached *root
     }
     return NULL; //no overlay 
 }
+
+//-----------------------------------------------------------------------------------------------------------------
+//                                         rbtree implementation
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -10,8 +10,6 @@ bpf_source = """
 BPF_PERCPU_ARRAY(insert_counts, u32, 1);
 int trace_rb_insert_color(struct pt_regs *ctx) {
     u32 key = 0;
-    
-    
     u32 *val = insert_counts.lookup(&key);
     if (val) {
         (*val)++;
