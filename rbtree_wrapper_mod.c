@@ -7,6 +7,7 @@
 #include <linux/uaccess.h>
 #include <linux/random.h> 
 #include <linux/rbtree_augmented.h>
+#include "wavl_tree_augmented.h"
 #define PROC_NAME "rbtree_test_cmd"
 DEFINE_PER_CPU(u64, baseline_rotations);
 DEFINE_PER_CPU(u64, baseline_path_length);
@@ -198,7 +199,7 @@ static void insert_wavl_node(int key)
     rb_link_node(&data->node, parent, new);
     wavl_insert(&data->node, &my_wavl_tree); 
 }
-static void insert_test_node(int key) //rbtree
+static void insert_rb_node(int key) //rbtree
 {
     struct rb_node **new = &(my_test_tree.rb_node), *parent = NULL;
     struct my_node *data = kmalloc(sizeof(struct my_node), GFP_KERNEL);
@@ -257,8 +258,8 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf, size
     pr_info("----------------------------------------\n");
     pr_info("Total Rotation Counts   | %11llu | %10llu\n", rb_rots, wavl_rots);
     pr_info("Average Rotation Counts | %7llu.%03llu | %6llu.%03llu\n", 
-            rb_rots / TOTAL_OPS, ((rb_rots * 1000) / TOTAL_OPS) % 1000,
-            wavl_rots / TOTAL_OPS, ((wavl_rots * 1000) / TOTAL_OPS) % 1000);
+            rb_rots / TOTAL_OPERATIONS, ((rb_rots * 1000) / TOTAL_OPERATIONS) % 1000,
+            wavl_rots / TOTAL_OPERATIONS, ((wavl_rots * 1000) / TOTAL_OPERATIONS) % 1000);
     pr_info("Total Rebalancing Path Len   | %11llu | %10llu\n", rb_path, wavl_path);
     pr_info("========================================\n");
     return count;
@@ -281,6 +282,9 @@ static void __exit rbtree_wrapper_exit(void)
     remove_proc_entry(PROC_NAME, NULL);
     
     rbtree_postorder_for_each_entry_safe(pos, n, &my_test_tree, node) {
+        kfree(pos);
+    }
+    rbtree_postorder_for_each_entry_safe(pos, n, &my_wavl_tree, node) {
         kfree(pos);
     }
     pr_info("[RB-Test] module unloaded \n");
