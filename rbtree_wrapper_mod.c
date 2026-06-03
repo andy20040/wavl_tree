@@ -251,17 +251,17 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf, size
         wavl_path += per_cpu(wavl_path_length, cpu);
     }
 
-    pr_info("========================================\n");
-    pr_info("           [ result graph ]\n");
-    pr_info("========================================\n");
-    pr_info("Pointer    |  RB Tree  |  WAVL Tree\n");
-    pr_info("----------------------------------------\n");
-    pr_info("Total Rotation Counts   | %11llu | %10llu\n", rb_rots, wavl_rots);
-    pr_info("Average Rotation Counts | %7llu.%03llu | %6llu.%03llu\n", 
+    pr_info("==================================================\n");
+    pr_info("                 [ result graph ]\n");
+    pr_info("==================================================\n");
+    pr_info("Metric                     |  RB Tree  | WAVL Tree\n");
+    pr_info("--------------------------------------------------\n");
+    pr_info("Total Rotation Counts      | %9llu | %9llu\n", rb_rots, wavl_rots);
+    pr_info("Average Rotation Counts    | %5llu.%03llu | %5llu.%03llu\n", 
             rb_rots / TOTAL_OPERATIONS, ((rb_rots * 1000) / TOTAL_OPERATIONS) % 1000,
             wavl_rots / TOTAL_OPERATIONS, ((wavl_rots * 1000) / TOTAL_OPERATIONS) % 1000);
-    pr_info("Total Rebalancing Path Len   | %11llu | %10llu\n", rb_path, wavl_path);
-    pr_info("========================================\n");
+    pr_info("Total Rebalancing Path Len | %9llu | %9llu\n", rb_path, wavl_path);
+    pr_info("==================================================\n");
     return count;
 }
 
