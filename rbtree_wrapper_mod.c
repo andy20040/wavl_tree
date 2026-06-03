@@ -5,7 +5,8 @@
 #include <linux/slab.h>
 #include <linux/proc_fs.h>
 #include <linux/uaccess.h>
-
+#include <linux/random.h> 
+#include <linux/rbtree_augmented.h>
 #define PROC_NAME "rbtree_test_cmd"
 DEFINE_PER_CPU(u64, baseline_rotations);
 DEFINE_PER_CPU(u64, baseline_path_length);
@@ -17,9 +18,20 @@ struct my_node {
     int key;
     struct rb_node node;
 };
+static void dummy_rotate(struct rb_node *old, struct rb_node *new) {}
 
 
-noinline void my_rb_insert_wrapper(struct rb_node *node, struct rb_root *root,
+static inline void
+__rb_rotate_set_parents(struct rb_node *old, struct rb_node *new,
+			struct rb_root *root, int color)
+{
+	struct rb_node *parent = rb_parent(old);
+	new->__rb_parent_color = old->__rb_parent_color;
+	rb_set_parent_color(old, new, color);
+	__rb_change_child(old, new, parent, root);
+}
+
+static noinline void my_rb_insert_wrapper(struct rb_node *node, struct rb_root *root,
 	    void (*augment_rotate)(struct rb_node *old, struct rb_node *new))
 {   // __rb_insert
     struct rb_node *parent = rb_red_parent(node), *gparent, *tmp;
@@ -185,7 +197,6 @@ static void insert_test_node(int key)
             new = &((*new)->rb_right);
         else {
             new = &((*new)->rb_right); //default insert right
-            return;
         }
     }
     rb_link_node(&data->node, parent, new);
@@ -195,17 +206,40 @@ static void insert_test_node(int key)
 
 static ssize_t rbtree_proc_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
-    int i;
-    pr_info("[RB-Test] insert node...\n");
+    int i, cpu;
+    u64 total_rotations = 0;
+    u64 total_path_length = 0;
+    const int TOTAL_OPERATIONS = 1000; 
+
+    pr_info("[RB-Test] insert %d nodes...\n", TOTAL_OPERATIONS);
     
-    for (i = 0; i < 1000; i++) {
-        insert_test_node(i);
+
+    for_each_possible_cpu(cpu) {
+        per_cpu(baseline_rotations, cpu) = 0;
+        per_cpu(baseline_path_length, cpu) = 0;
+    }
+
+    for (i = 0; i < TOTAL_OPERATIONS; i++) {
+        insert_test_node(get_random_u32() % 1000000);
     }
     
-    pr_info("[RB-Test] insertion complete\n");
+    for_each_possible_cpu(cpu) {
+        total_rotations += per_cpu(baseline_rotations, cpu);
+        total_path_length += per_cpu(baseline_path_length, cpu);
+    }
+
+    pr_info("[RB-Test] insertion complete！\n");
+    pr_info(" -  (Insertions): %d\n", TOTAL_OPERATIONS);
+    pr_info(" -  (Rotations) : %llu\n", total_rotations);
+    pr_info(" -  (Rebalancing Path Len)  : %llu\n", total_path_length);
+    
+    /* use fixed point */
+    pr_info(" - Average Rotations: %llu.%03llu\n", 
+            total_rotations / TOTAL_OPERATIONS, 
+            ((total_rotations * 1000) / TOTAL_OPERATIONS) % 1000);
+
     return count;
 }
-
 
 static const struct proc_ops rbtree_proc_ops = {
     .proc_write = rbtree_proc_write,
@@ -214,7 +248,7 @@ static const struct proc_ops rbtree_proc_ops = {
 static int __init rbtree_wrapper_init(void)
 {
     proc_create(PROC_NAME, 0666, NULL, &rbtree_proc_ops);
-    pr_info("[RB-Test] module loaded\n", PROC_NAME);
+    pr_info("[RB-Test] %s module loaded\n", PROC_NAME);
     return 0;
 }
 
