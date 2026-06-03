@@ -20,7 +20,10 @@ struct my_node {
 };
 static void dummy_rotate(struct rb_node *old, struct rb_node *new) {}
 
-
+static inline struct rb_node *rb_red_parent(struct rb_node *red)
+{
+	return (struct rb_node *)red->__rb_parent_color;
+}
 static inline void
 __rb_rotate_set_parents(struct rb_node *old, struct rb_node *new,
 			struct rb_root *root, int color)
@@ -174,11 +177,10 @@ static noinline void my_rb_insert_wrapper(struct rb_node *node, struct rb_root *
 }
 
 
-void my_rb_insert_color(struct rb_node *node, struct rb_root *root)
+static void my_rb_insert_color(struct rb_node *node, struct rb_root *root)
 {
 	my_rb_insert_wrapper(node, root, dummy_rotate);
 }
-EXPORT_SYMBOL(my_rb_insert_color);
 static void insert_test_node(int key)
 {
     struct rb_node **new = &(my_test_tree.rb_node), *parent = NULL;
