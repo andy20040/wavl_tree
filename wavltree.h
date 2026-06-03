@@ -1,8 +1,10 @@
 /* wavl_tree.h */
 #ifndef _WAVL_TREE_H
 #define _WAVL_TREE_H
-
-#include <linux/rbtree.h> //
+#include <linux/percpu.h>
+#include <linux/rbtree.h> 
+DECLARE_PER_CPU(u64, wavl_rotations);
+DECLARE_PER_CPU(u64, wavl_path_length);
 extern void wavl_replace_node(struct rb_node *victim, struct rb_node *new,struct rb_root *root);
 extern void wavl_replace_node_rcu(struct rb_node *victim, struct rb_node *new,struct rb_root *root);
 void wavl_insert(struct rb_node *node, struct rb_root *root);

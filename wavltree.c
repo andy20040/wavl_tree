@@ -2,9 +2,11 @@
 #include <linux/rbtree.h> 
 #include "wavl_tree_augmented.h"
 
-
+DEFINE_PER_CPU(u64, wavl_rotations);
+DEFINE_PER_CPU(u64, wavl_path_length);
 
 static void wavl_rotate_left(struct rb_node *node, struct rb_root *root, void (*augment_rotate)(struct rb_node *old, struct rb_node *new)) {
+    this_cpu_inc(wavl_rotations);
     struct rb_node *right = node->rb_right;
     struct rb_node *parent = wavl_parent(node);
     if ((node->rb_right = right->rb_left))
@@ -17,6 +19,7 @@ static void wavl_rotate_left(struct rb_node *node, struct rb_root *root, void (*
 }
 
 static void wavl_rotate_right(struct rb_node *node, struct rb_root *root, void (*augment_rotate)(struct rb_node *old, struct rb_node *new)) {
+    this_cpu_inc(wavl_rotations);
     struct rb_node *left = node->rb_left;
     struct rb_node *parent = wavl_parent(node);
     if ((node->rb_left = left->rb_right))
@@ -33,6 +36,7 @@ static void wavl_rotate_right(struct rb_node *node, struct rb_root *root, void (
 static __always_inline void __wavl_insert(struct rb_node *node, struct rb_root *root,void (*augment_rotate)(struct rb_node *old, struct rb_node *new)) {
     struct rb_node *parent, *sibling;
     while(true){
+        this_cpu_inc(wavl_path_length);
         parent = wavl_parent(node);
         if (unlikely(!parent)) {
 			break;

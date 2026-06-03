@@ -2,7 +2,6 @@
 #define _WAVL_TREE_AUGMENTED_H
 #include "wavltree.h"
 #include <linux/rcupdate.h>
-
 #define WAVL_RANK_MASK 3UL       
 #define WAVL_PARENT_MASK ~3UL    
 

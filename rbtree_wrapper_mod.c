@@ -11,8 +11,8 @@
 DEFINE_PER_CPU(u64, baseline_rotations);
 DEFINE_PER_CPU(u64, baseline_path_length);
 
-struct rb_root my_test_tree = RB_ROOT;
-
+struct rb_root my_test_tree = RB_ROOT; //rbtree
+struct rb_root my_wavl_tree = RB_ROOT; //wavl_tree
 
 struct my_node {
     int key;
@@ -181,15 +181,30 @@ static void my_rb_insert_color(struct rb_node *node, struct rb_root *root)
 {
 	my_rb_insert_wrapper(node, root, dummy_rotate);
 }
-static void insert_test_node(int key)
+static void insert_wavl_node(int key)
+{
+    struct rb_node **new = &(my_wavl_tree.rb_node), *parent = NULL;
+    struct my_node *data = kmalloc(sizeof(struct my_node), GFP_KERNEL);
+    
+    if (!data) return;
+    data->key = key;
+
+    while (*new) {
+        struct my_node *this = container_of(*new, struct my_node, node);
+        parent = *new;
+        if (key < this->key) new = &((*new)->rb_left);
+        else new = &((*new)->rb_right); 
+    }
+    rb_link_node(&data->node, parent, new);
+    wavl_insert(&data->node, &my_wavl_tree); 
+}
+static void insert_test_node(int key) //rbtree
 {
     struct rb_node **new = &(my_test_tree.rb_node), *parent = NULL;
     struct my_node *data = kmalloc(sizeof(struct my_node), GFP_KERNEL);
     
     if (!data) return;
     data->key = key;
-
-
     while (*new) {
         struct my_node *this = container_of(*new, struct my_node, node);
         parent = *new;
@@ -209,37 +224,43 @@ static void insert_test_node(int key)
 static ssize_t rbtree_proc_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
     int i, cpu;
-    u64 total_rotations = 0;
-    u64 total_path_length = 0;
+    u32 random_key;
+    u64 rb_rots = 0, rb_path = 0;
+    u64 wavl_rots = 0, wavl_path = 0;
     const int TOTAL_OPERATIONS = 1000; 
-
-    pr_info("[RB-Test] insert %d nodes...\n", TOTAL_OPERATIONS);
-    
-
     for_each_possible_cpu(cpu) {
         per_cpu(baseline_rotations, cpu) = 0;
         per_cpu(baseline_path_length, cpu) = 0;
+        per_cpu(wavl_rotations, cpu) = 0;
+        per_cpu(wavl_path_length, cpu) = 0;
     }
 
+    pr_info("[RB-Test] insert %d nodes...\n", TOTAL_OPERATIONS);
+    
     for (i = 0; i < TOTAL_OPERATIONS; i++) {
-        insert_test_node(get_random_u32() % 1000000);
+        random_key = get_random_u32() % 1000000;
+        insert_rb_node(random_key);   
+        insert_wavl_node(random_key);
     }
     
     for_each_possible_cpu(cpu) {
-        total_rotations += per_cpu(baseline_rotations, cpu);
-        total_path_length += per_cpu(baseline_path_length, cpu);
+        rb_rots += per_cpu(baseline_rotations, cpu);
+        rb_path += per_cpu(baseline_path_length, cpu);
+        wavl_rots += per_cpu(wavl_rotations, cpu);
+        wavl_path += per_cpu(wavl_path_length, cpu);
     }
 
-    pr_info("[RB-Test] insertion complete！\n");
-    pr_info(" -  (Insertions): %d\n", TOTAL_OPERATIONS);
-    pr_info(" -  (Rotations) : %llu\n", total_rotations);
-    pr_info(" -  (Rebalancing Path Len)  : %llu\n", total_path_length);
-    
-    /* use fixed point */
-    pr_info(" - Average Rotations: %llu.%03llu\n", 
-            total_rotations / TOTAL_OPERATIONS, 
-            ((total_rotations * 1000) / TOTAL_OPERATIONS) % 1000);
-
+    pr_info("========================================\n");
+    pr_info("           [ result graph ]\n");
+    pr_info("========================================\n");
+    pr_info("Pointer    |  RB Tree  |  WAVL Tree\n");
+    pr_info("----------------------------------------\n");
+    pr_info("Total Rotation Counts   | %11llu | %10llu\n", rb_rots, wavl_rots);
+    pr_info("Average Rotation Counts | %7llu.%03llu | %6llu.%03llu\n", 
+            rb_rots / TOTAL_OPS, ((rb_rots * 1000) / TOTAL_OPS) % 1000,
+            wavl_rots / TOTAL_OPS, ((wavl_rots * 1000) / TOTAL_OPS) % 1000);
+    pr_info("Total Rebalancing Path Len   | %11llu | %10llu\n", rb_path, wavl_path);
+    pr_info("========================================\n");
     return count;
 }
 
