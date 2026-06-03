@@ -252,7 +252,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf, size
     }
 
     pr_info("==================================================\n");
-    pr_info("          [ fully insertresult graph ]\n");
+    pr_info("          [ fully insert result graph ]\n");
     pr_info("==================================================\n");
     pr_info("Metric                     |  RB Tree  | WAVL Tree\n");
     pr_info("--------------------------------------------------\n");
