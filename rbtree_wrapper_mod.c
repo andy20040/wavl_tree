@@ -1,0 +1,236 @@
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/rbtree.h>
+#include <linux/slab.h>
+#include <linux/proc_fs.h>
+#include <linux/uaccess.h>
+
+#define PROC_NAME "rbtree_test_cmd"
+DEFINE_PER_CPU(u64, baseline_rotations);
+DEFINE_PER_CPU(u64, baseline_path_length);
+
+struct rb_root my_test_tree = RB_ROOT;
+
+
+struct my_node {
+    int key;
+    struct rb_node node;
+};
+
+
+noinline void my_rb_insert_wrapper(struct rb_node *node, struct rb_root *root,
+	    void (*augment_rotate)(struct rb_node *old, struct rb_node *new))
+{   // __rb_insert
+    struct rb_node *parent = rb_red_parent(node), *gparent, *tmp;
+
+        while (true) {
+            /*
+            * Loop invariant: node is red.
+            */
+            this_cpu_inc(baseline_path_length); //go up 1 layer every loop
+            if (unlikely(!parent)) {
+                /*
+                * The inserted node is root. Either this is the
+                * first node, or we recursed at Case 1 below and
+                * are no longer violating 4).
+                */
+                rb_set_parent_color(node, NULL, RB_BLACK);
+                break;
+            }
+
+            /*
+            * If there is a black parent, we are done.
+            * Otherwise, take some corrective action as,
+            * per 4), we don't want a red root or two
+            * consecutive red nodes.
+            */
+            if(rb_is_black(parent))
+                break;
+
+            gparent = rb_red_parent(parent);
+
+            tmp = gparent->rb_right;
+            if (parent != tmp) {	/* parent == gparent->rb_left */
+                if (tmp && rb_is_red(tmp)) {
+                    /*
+                    * Case 1 - node's uncle is red (color flips).
+                    *
+                    *       G            g
+                    *      / \          / \
+                    *     p   u  -->   P   U
+                    *    /            /
+                    *   n            n
+                    *
+                    * However, since g's parent might be red, and
+                    * 4) does not allow this, we need to recurse
+                    * at g.
+                    */
+                    rb_set_parent_color(tmp, gparent, RB_BLACK);
+                    rb_set_parent_color(parent, gparent, RB_BLACK);
+                    node = gparent;
+                    parent = rb_parent(node);
+                    rb_set_parent_color(node, parent, RB_RED);
+                    continue;
+                }
+
+                tmp = parent->rb_right;
+                if (node == tmp) {
+                    /*
+                    * Case 2 - node's uncle is black and node is
+                    * the parent's right child (left rotate at parent).
+                    *
+                    *      G             G
+                    *     / \           / \
+                    *    p   U  -->    n   U
+                    *     \           /
+                    *      n         p
+                    *
+                    * This still leaves us in violation of 4), the
+                    * continuation into Case 3 will fix that.
+                    */
+                    tmp = node->rb_left;
+                    WRITE_ONCE(parent->rb_right, tmp);
+                    WRITE_ONCE(node->rb_left, parent);
+                    if (tmp)
+                        rb_set_parent_color(tmp, parent,
+                                    RB_BLACK);
+                    rb_set_parent_color(parent, node, RB_RED);
+                    augment_rotate(parent, node);
+                    this_cpu_inc(baseline_rotations); //rotate once
+                    parent = node;
+                    tmp = node->rb_right;
+                }
+
+                /*
+                * Case 3 - node's uncle is black and node is
+                * the parent's left child (right rotate at gparent).
+                *
+                *        G           P
+                *       / \         / \
+                *      p   U  -->  n   g
+                *     /                 \
+                *    n                   U
+                */
+                WRITE_ONCE(gparent->rb_left, tmp); /* == parent->rb_right */
+                WRITE_ONCE(parent->rb_right, gparent);
+                if (tmp)
+                    rb_set_parent_color(tmp, gparent, RB_BLACK);
+                __rb_rotate_set_parents(gparent, parent, root, RB_RED);
+                augment_rotate(gparent, parent);
+                this_cpu_inc(baseline_rotations); //rotate once
+                break;
+            } else {
+                tmp = gparent->rb_left;
+                if (tmp && rb_is_red(tmp)) {
+                    /* Case 1 - color flips */
+                    rb_set_parent_color(tmp, gparent, RB_BLACK);
+                    rb_set_parent_color(parent, gparent, RB_BLACK);
+                    node = gparent;
+                    parent = rb_parent(node);
+                    rb_set_parent_color(node, parent, RB_RED);
+                    continue;
+                }
+
+                tmp = parent->rb_left;
+                if (node == tmp) {
+                    /* Case 2 - right rotate at parent */
+                    tmp = node->rb_right;
+                    WRITE_ONCE(parent->rb_left, tmp);
+                    WRITE_ONCE(node->rb_right, parent);
+                    if (tmp)
+                        rb_set_parent_color(tmp, parent,
+                                    RB_BLACK);
+                    rb_set_parent_color(parent, node, RB_RED);
+                    augment_rotate(parent, node);
+                    this_cpu_inc(baseline_rotations); //rotate once
+                    parent = node;
+                    tmp = node->rb_left;
+                }
+
+                /* Case 3 - left rotate at gparent */
+                WRITE_ONCE(gparent->rb_right, tmp); /* == parent->rb_left */
+                WRITE_ONCE(parent->rb_left, gparent);
+                if (tmp)
+                    rb_set_parent_color(tmp, gparent, RB_BLACK);
+                __rb_rotate_set_parents(gparent, parent, root, RB_RED);
+                augment_rotate(gparent, parent);
+                this_cpu_inc(baseline_rotations); //rotate once
+                break;
+            }
+        }
+}
+
+
+void my_rb_insert_color(struct rb_node *node, struct rb_root *root)
+{
+	my_rb_insert_wrapper(node, root, dummy_rotate);
+}
+EXPORT_SYMBOL(my_rb_insert_color);
+static void insert_test_node(int key)
+{
+    struct rb_node **new = &(my_test_tree.rb_node), *parent = NULL;
+    struct my_node *data = kmalloc(sizeof(struct my_node), GFP_KERNEL);
+    
+    if (!data) return;
+    data->key = key;
+
+
+    while (*new) {
+        struct my_node *this = container_of(*new, struct my_node, node);
+        parent = *new;
+        if (key < this->key)
+            new = &((*new)->rb_left);
+        else if (key > this->key)
+            new = &((*new)->rb_right);
+        else {
+            new = &((*new)->rb_right); //default insert right
+            return;
+        }
+    }
+    rb_link_node(&data->node, parent, new);
+    //target
+    my_rb_insert_color(&data->node, &my_test_tree);
+}
+
+static ssize_t rbtree_proc_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
+{
+    int i;
+    pr_info("[RB-Test] insert node...\n");
+    
+    for (i = 0; i < 1000; i++) {
+        insert_test_node(i);
+    }
+    
+    pr_info("[RB-Test] insertion complete\n");
+    return count;
+}
+
+
+static const struct proc_ops rbtree_proc_ops = {
+    .proc_write = rbtree_proc_write,
+};
+
+static int __init rbtree_wrapper_init(void)
+{
+    proc_create(PROC_NAME, 0666, NULL, &rbtree_proc_ops);
+    pr_info("[RB-Test] module loaded\n", PROC_NAME);
+    return 0;
+}
+
+static void __exit rbtree_wrapper_exit(void)
+{
+    struct my_node *pos, *n;
+    remove_proc_entry(PROC_NAME, NULL);
+    
+    rbtree_postorder_for_each_entry_safe(pos, n, &my_test_tree, node) {
+        kfree(pos);
+    }
+    pr_info("[RB-Test] module unloaded \n");
+}
+
+module_init(rbtree_wrapper_init);
+module_exit(rbtree_wrapper_exit);
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Chen Yen Yu");
+MODULE_DESCRIPTION("A wrapper module for tracing native rbtree");

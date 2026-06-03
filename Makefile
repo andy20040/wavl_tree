@@ -3,7 +3,10 @@ obj-m += wavl_tree_mod.o
 
 
 wavl_tree_mod-objs := wavltree.o wavl_test.o
+obj-m += rbtree_wrapper_mod.o
 
+
+ccflags-y := -pg -O2
 
 KDIR := /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
