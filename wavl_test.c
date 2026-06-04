@@ -216,32 +216,13 @@ static int verify_wavl_properties(struct rb_root_cached *root) {
          * ========================================= */
         if (last_node) {
             struct my_wavl_node *last_my_node = container_of(last_node, struct my_wavl_node, node);
-            /* allow duplicate key */
-            if (last_my_node->key > my_node->key) { 
-                pr_err("[ERROR] BST order wrong！ previous Key %d greater than current Key %d\n", 
+            if (last_my_node->key >= my_node->key) {
+                pr_err("[ERROR] BST order wrong！ front Key %d greater than current Key %d\n", 
                        last_my_node->key, my_node->key);
                 error = 1;
             }
         }
         last_node = node;
-
-        /* secure duplicate key is on the right */
-        if (node->rb_left) {
-            struct my_wavl_node *left_child = container_of(node->rb_left, struct my_wavl_node, node);
-            if (left_child->key >= my_node->key) { 
-                pr_err("[ERROR] Wrong key！ Key %d left node is  %d \n", 
-                       my_node->key, left_child->key);
-                error = 1;
-            }
-        }
-        if (node->rb_right) {
-            struct my_wavl_node *right_child = container_of(node->rb_right, struct my_wavl_node, node);
-            if (right_child->key < my_node->key) { 
-                pr_err("[ERROR] Wrong key！ Key %d right node is  %d\n", 
-                       my_node->key, right_child->key);
-                error = 1;
-            }
-        }
         unsigned long diff_l = wavl_rank_diff(node, node->rb_left);
         unsigned long diff_r = wavl_rank_diff(node, node->rb_right);
         /* =========================================
