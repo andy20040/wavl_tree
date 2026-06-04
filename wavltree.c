@@ -9,6 +9,7 @@ static void wavl_rotate_left(struct rb_node *node, struct rb_root *root, void (*
     this_cpu_inc(wavl_rotations);
     struct rb_node *right = node->rb_right;
     struct rb_node *parent = wavl_parent(node);
+    if (WARN_ON_ONCE(!right)) return;
     if ((node->rb_right = right->rb_left))
         wavl_set_parent(right->rb_left, node);
     wavl_set_parent(right,parent);
@@ -22,6 +23,7 @@ static void wavl_rotate_right(struct rb_node *node, struct rb_root *root, void (
     this_cpu_inc(wavl_rotations);
     struct rb_node *left = node->rb_left;
     struct rb_node *parent = wavl_parent(node);
+    if (WARN_ON_ONCE(!left)) return;
     if ((node->rb_left = left->rb_right))
         wavl_set_parent(left->rb_right, node);
     wavl_set_parent(left,parent);
@@ -124,7 +126,13 @@ static __always_inline void ____wavl_erase(struct rb_node *rebalance_node, struc
     while (true) {
         unsigned long diff_l = wavl_rank_diff(x, x->rb_left);
         unsigned long diff_r = wavl_rank_diff(x, x->rb_right);
-        
+        // 2-2 leaf
+        if (diff_l == 2 && diff_r == 2 && wavl_is_leaf(x)) {
+            wavl_demote(x);
+            x = wavl_parent(x);
+            if (!x) break;
+            continue;
+        }
         if (diff_l != 3 && diff_r != 3) {
             break;
         }

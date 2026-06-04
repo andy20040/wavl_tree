@@ -56,7 +56,7 @@ static inline unsigned long compute_interval_max(struct my_wavl_interval_node *n
 WAVL_DECLARE_CALLBACKS_MAX(static, my_aug_callbacks,struct my_wavl_interval_node, node, int, subtree_max_end, compute_interval_max)
 #define TEST_NODES_COUNT 256  //total node to insert
 #define DELETE_NODES_COUNT 128 //total node to delete
-#define ACTION_COUNT 50 //total actions for mixed
+#define ACTION_COUNT 512 //total actions for mixed
 static struct proc_dir_entry *wavl_proc_ent;
 struct rb_root_cached my_tree = RB_ROOT_CACHED;
 static struct my_wavl_node test_nodes[TEST_NODES_COUNT];
