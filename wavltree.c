@@ -124,6 +124,7 @@ static __always_inline void ____wavl_erase(struct rb_node *rebalance_node, struc
     struct rb_node  *sibling;
 
     while (true) {
+        this_cpu_inc(wavl_path_length);
         unsigned long diff_l = wavl_rank_diff(x, x->rb_left);
         unsigned long diff_r = wavl_rank_diff(x, x->rb_right);
         // 2-2 leaf
