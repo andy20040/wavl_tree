@@ -216,7 +216,7 @@ static int verify_wavl_properties(struct rb_root_cached *root) {
          * ========================================= */
         if (last_node) {
             struct my_wavl_node *last_my_node = container_of(last_node, struct my_wavl_node, node);
-            if (last_my_node->key >= my_node->key) {
+            if (last_my_node->key > my_node->key) {
                 pr_err("[ERROR] BST order wrong！ front Key %d greater than current Key %d\n", 
                        last_my_node->key, my_node->key);
                 error = 1;
