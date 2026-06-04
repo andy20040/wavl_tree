@@ -8,6 +8,7 @@
 #include <linux/random.h> 
 #include <linux/rbtree_augmented.h>
 #include "wavl_tree_augmented.h"
+#include <linux/vmalloc.h>
 #define PROC_NAME "rbtree_test_cmd"
 DEFINE_PER_CPU(u64, baseline_rotations);
 DEFINE_PER_CPU(u64, baseline_path_length);
@@ -18,7 +19,19 @@ struct my_node {
     int key;
     struct rb_node node;
 };
-static void dummy_rotate(struct rb_node *old, struct rb_node *new) {}
+static inline void dummy_propagate(struct rb_node *node, struct rb_node *stop) {}
+static inline void dummy_copy(struct rb_node *old, struct rb_node *new) {}
+static inline void dummy_rotate(struct rb_node *old, struct rb_node *new) {}
+
+static const struct rb_augment_callbacks dummy_callbacks = {
+	.propagate = dummy_propagate,
+	.copy = dummy_copy,
+	.rotate = dummy_rotate
+};
+
+
+
+
 
 static inline struct rb_node *rb_red_parent(struct rb_node *red)
 {
@@ -32,6 +45,10 @@ __rb_rotate_set_parents(struct rb_node *old, struct rb_node *new,
 	new->__rb_parent_color = old->__rb_parent_color;
 	rb_set_parent_color(old, new, color);
 	__rb_change_child(old, new, parent, root);
+}
+static inline void rb_set_black(struct rb_node *rb)
+{
+	rb->__rb_parent_color += RB_BLACK;
 }
 
 static noinline void my_rb_insert_wrapper(struct rb_node *node, struct rb_root *root,
@@ -367,22 +384,22 @@ ____myrb_erase_color(struct rb_node *parent, struct rb_root *root,
 }
 
 /* Non-inline version for rb_erase_augmented() use */
-void __myrb_erase_color(struct rb_node *parent, struct rb_root *root,
+static void __myrb_erase_color(struct rb_node *parent, struct rb_root *root,
 	void (*augment_rotate)(struct rb_node *old, struct rb_node *new))
 {
 	____myrb_erase_color(parent, root, augment_rotate);
 }
-EXPORT_SYMBOL(__myrb_erase_color);
 
 
-void my_rb_erase(struct rb_node *node, struct rb_root *root)
+
+static void my_rb_erase(struct rb_node *node, struct rb_root *root)
 {
 	struct rb_node *rebalance;
-	rebalance = __myrb_erase_augmented(node, root, &dummy_callbacks);
+	rebalance = __rb_erase_augmented(node, root, &dummy_callbacks);
 	if (rebalance)
 		____myrb_erase_color(rebalance, root, dummy_rotate);
 }
-EXPORT_SYMBOL(rb_erase);
+
 
 
 
@@ -403,7 +420,7 @@ static struct my_node* insert_wavl_node(int key)
     struct rb_node **new = &(my_wavl_tree.rb_node), *parent = NULL;
     struct my_node *data = kmalloc(sizeof(struct my_node), GFP_KERNEL);
     
-    if (!data) return;
+    if (!data) return NULL;
     data->key = key;
 
     while (*new) {
@@ -421,7 +438,7 @@ static struct my_node* insert_rb_node(int key) //rbtree
     struct rb_node **new = &(my_test_tree.rb_node), *parent = NULL;
     struct my_node *data = kmalloc(sizeof(struct my_node), GFP_KERNEL);
     
-    if (!data) return;
+    if (!data) return  NULL;
     data->key = key;
     while (*new) {
         struct my_node *this = container_of(*new, struct my_node, node);
@@ -459,16 +476,16 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf, size
 
     struct my_node **rb_nodes = vmalloc(TOTAL_OPERATIONS * sizeof(struct my_node *));
     struct my_node **wavl_nodes = vmalloc(TOTAL_OPERATIONS * sizeof(struct my_node *));
-    int *indices = vmalloc(TOTAL_OPERATIONS * sizeof(int)); /* index for shuffle */
-    
+    int *indices = kmalloc_array(TOTAL_OPERATIONS , sizeof(int), GFP_KERNEL); /* index for shuffle */
     if (!rb_nodes || !wavl_nodes || !indices) {
         pr_err("Memory allocation failed!\n");
+        
         if (rb_nodes) vfree(rb_nodes);
         if (wavl_nodes) vfree(wavl_nodes);
-        if (indices) vfree(indices);
-        return -ENOMEM;
+        if (indices) kfree(indices); 
+        
+        return -ENOMEM; 
     }
-    
     /* ==========================================
      * Insert 
      * ========================================== */
@@ -568,7 +585,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf, size
 
     vfree(rb_nodes);
     vfree(wavl_nodes);
-    vfree(indices);
+    kfree(indices);
 
     struct my_node *pos, *n;
     rbtree_postorder_for_each_entry_safe(pos, n, &my_test_tree, node) {
@@ -577,7 +594,8 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf, size
     rbtree_postorder_for_each_entry_safe(pos, n, &my_wavl_tree, node) {
         kfree(pos);
     }
-
+    my_wavl_tree = RB_ROOT;
+    my_test_tree = RB_ROOT;
     return count;
 }
 
@@ -594,10 +612,7 @@ static int __init rbtree_wrapper_init(void)
 
 static void __exit rbtree_wrapper_exit(void)
 {
-    struct my_node *pos, *n;
     remove_proc_entry(PROC_NAME, NULL);
-    
-    
     pr_info("[RB-Test] module unloaded \n");
 }
 
