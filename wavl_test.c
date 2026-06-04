@@ -54,8 +54,8 @@ static inline unsigned long compute_interval_max(struct my_wavl_interval_node *n
 }
 
 WAVL_DECLARE_CALLBACKS_MAX(static, my_aug_callbacks,struct my_wavl_interval_node, node, int, subtree_max_end, compute_interval_max)
-#define TEST_NODES_COUNT 20  //total node to insert
-#define DELETE_NODES_COUNT 10 //total node to delete
+#define TEST_NODES_COUNT 256  //total node to insert
+#define DELETE_NODES_COUNT 128 //total node to delete
 #define ACTION_COUNT 50 //total actions for mixed
 static struct proc_dir_entry *wavl_proc_ent;
 struct rb_root_cached my_tree = RB_ROOT_CACHED;
@@ -162,65 +162,6 @@ static struct my_wavl_interval_node *interval_search(struct rb_root_cached *root
     return NULL; //no overlay 
 }
 
-//-----------------------------------------------------------------------------------------------------------------
-//                                         rbtree implementation
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 static void print_tree_inorder(struct rb_root *root) {
     struct rb_node *node;
@@ -262,15 +203,31 @@ static int verify_leftmost(struct rb_root_cached *root) {
 }
 static int verify_wavl_properties(struct rb_root_cached *root) {
     struct rb_node *node;
+    struct rb_node *last_node = NULL; //for BST traversal
     int count = 0;
     int error = 0; 
 
     for (node = rb_first(&root->rb_root); node; node = rb_next(node)) {
         struct my_wavl_node *my_node = container_of(node, struct my_wavl_node, node);
         
+
+        /* =========================================
+         * Property 1: BST check (Strict Ordering)
+         * ========================================= */
+        if (last_node) {
+            struct my_wavl_node *last_my_node = container_of(last_node, struct my_wavl_node, node);
+            if (last_my_node->key >= my_node->key) {
+                pr_err("[ERROR] BST order wrong！ front Key %d greater than current Key %d\n", 
+                       last_my_node->key, my_node->key);
+                error = 1;
+            }
+        }
+        last_node = node;
         unsigned long diff_l = wavl_rank_diff(node, node->rb_left);
         unsigned long diff_r = wavl_rank_diff(node, node->rb_right);
-
+        /* =========================================
+         * Property 2: parent child pointer Consistency
+         * ========================================= */
         if (node->rb_left && wavl_parent(node->rb_left) != node) {
             pr_err("[ERROR] Parent mismatch! Key %d left\n", my_node->key);
             error = 1;
@@ -279,7 +236,20 @@ static int verify_wavl_properties(struct rb_root_cached *root) {
             pr_err("[ERROR] Parent mismatch! Key %d right\n", my_node->key);
             error = 1;
         }
+        /* =========================================
+         * Property 3: leaf base case check (Leaf Node Rank = 0)
+         * ========================================= */
 
+        if(wavl_is_leaf(node)){
+            if (diff_l != 1 || diff_r != 1) {
+                pr_err("[ERROR] leaf node rank not correct！ Key %d is leaf，but rank diff is  (left:%lu, right:%lu) (should be 1,1)\n", 
+                       my_node->key, diff_l, diff_r);
+                error = 1;
+            }
+        }
+        /* =========================================
+         * Property 4: WAVL rank property
+         * ========================================= */
         if (diff_l != 1 && diff_l != 2) {
             pr_err("[ERROR] Rank Violation! Key %d left diff is %lu\n", my_node->key, diff_l);
             error = 1;
