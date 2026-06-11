@@ -11,11 +11,11 @@ echo my_rb_insert_wrapper > $TRACE_DIR/set_ftrace_filter
 echo my_rb_erase >> $TRACE_DIR/set_ftrace_filter
 
 echo 1 > $TRACE_DIR/function_profile_enabled
-
-echo "start ... ( Waiting for  60 seconds )"
-sleep 60
+echo "start" > /proc/rbtree_test_cmd
+echo "start ... ( Waiting for  2 seconds )"
+sleep 2
 
 
 echo 0 > $TRACE_DIR/function_profile_enabled
 
-cat $TRACE_DIR/trace_stat/function0 | head -n 5
+cat $TRACE_DIR/trace_stat/function* | grep my_rb_
