@@ -6,7 +6,6 @@
 #include <linux/uaccess.h>   
 #include <linux/string.h>
 #include "wavl_tree_augmented.h"
-#include <linux/log2.h>
 #define PROC_NAME "wavl_cmd"
 static int nodecount=0;
 
@@ -272,17 +271,15 @@ static int verify_wavl_properties(struct rb_root_cached *root) {
     /* =========================================
     * Property 5: WAVL height property
     * ========================================= */
-    if (nodecount > 2) {
-        int current_height = get_max_height(root->rb_root.rb_node);
-        unsigned long max_allowed_height = 2 * ilog2(nodecount) + 2;
-        if (current_height > max_allowed_height) {
-            pr_err("[ERROR] Height Bound Violation! nodecount: %d, current_h: %d, max_allowed: %lu\n",
-                nodecount, current_height, max_allowed_height);
-            error = 1;
-        } else {
-            pr_info("  -> [Height Check] Current Height: %d, Theoretical Max: %lu (Nodes: %d)\n", 
-                    current_height, max_allowed_height, nodecount);
-        }
+    if (nodecount > 0) {
+    int h = get_max_height(root->rb_root.rb_node);
+    unsigned long min_n = 1UL << ((h + 1) / 2);
+    
+    if (nodecount < min_n) {
+        pr_err("[ERROR] WAVL Structural Violation! Height is %d, but nodes count %d < required %lu\n", 
+               h, nodecount, min_n);
+        error = 1;
+    }
     }
     if (verify_leftmost(root) != 0) error = 1;
     if (error) return -1; 
