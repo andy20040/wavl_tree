@@ -51,7 +51,7 @@ static inline void rb_set_black(struct rb_node *rb)
 	rb->__rb_parent_color += RB_BLACK;
 }
 
-static noinline void my_rb_insert_wrapper(struct rb_node *node, struct rb_root *root,
+noinline void my_rb_insert_wrapper(struct rb_node *node, struct rb_root *root,
 	    void (*augment_rotate)(struct rb_node *old, struct rb_node *new))
 {   // __rb_insert
     struct rb_node *parent = rb_red_parent(node), *gparent, *tmp;
@@ -392,7 +392,7 @@ static void __myrb_erase_color(struct rb_node *parent, struct rb_root *root,
 
 
 
-static void my_rb_erase(struct rb_node *node, struct rb_root *root)
+void my_rb_erase(struct rb_node *node, struct rb_root *root)
 {
 	struct rb_node *rebalance;
 	rebalance = __rb_erase_augmented(node, root, &dummy_callbacks);
