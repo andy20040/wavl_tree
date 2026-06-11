@@ -287,7 +287,7 @@ static int verify_wavl_properties(struct rb_root_cached *root) {
     if (verify_leftmost(root) != 0) error = 1;
     if (error) return -1; 
 
-    pr_info("[OK] WAVL Invariants Verified. Rank, Leftmost, Augmented check passed! (%d nodes)\n", count);
+    pr_info("[OK] WAVL Invariants Verified. Rank, Leftmost, Augmented, Height check passed! (%d nodes)\n", count);
     return 0;
 }
 static unsigned long verify_interval_metadata(struct rb_node *node, int *error_flag) {
