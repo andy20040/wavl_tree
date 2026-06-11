@@ -8,7 +8,7 @@ echo > $TRACE_DIR/set_ftrace_pid
 
 #set function
 echo my_rb_insert_wrapper > $TRACE_DIR/set_ftrace_filter
-echo my_rb_erase > $TRACE_DIR/set_ftrace_filter
+echo my_rb_erase >> $TRACE_DIR/set_ftrace_filter
 
 echo 1 > $TRACE_DIR/function_profile_enabled
 
