@@ -1,5 +1,5 @@
 #!/bin/bash
-TRACE_DIR=/sys/kernel/tracing  # 或者是 /sys/kernel/debug/tracing
+TRACE_DIR=/sys/kernel/tracing  
 
 
 echo 0 > $TRACE_DIR/tracing_on
@@ -7,13 +7,13 @@ echo > $TRACE_DIR/set_ftrace_filter
 echo > $TRACE_DIR/set_ftrace_pid
 
 #set function
-echo rb_insert_color > $TRACE_DIR/set_ftrace_filter
-echo rb_erase >> $TRACE_DIR/set_ftrace_filter
+echo my_rb_insert_wrapper > $TRACE_DIR/set_ftrace_filter
+echo ____myrb_erase_color >> $TRACE_DIR/set_ftrace_filter
 
 echo 1 > $TRACE_DIR/function_profile_enabled
 
-echo "start ... ( Waiting for  10 seconds )"
-sleep 10
+echo "start ... ( Waiting for  60 seconds )"
+sleep 60
 
 
 echo 0 > $TRACE_DIR/function_profile_enabled
