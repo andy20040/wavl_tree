@@ -175,7 +175,7 @@ static void print_tree_inorder(struct rb_root *root) {
     }
     pr_info("=====================================\n");
 }
-static void print_tree_reverse(struct rb_root *root) {#include <linux/log2.h>
+static void print_tree_reverse(struct rb_root *root) {
     struct rb_node *node;
     pr_info("=== Reverse Inorder Result ===\n");
     for (node = rb_last(root); node; node = rb_prev(node)) {
