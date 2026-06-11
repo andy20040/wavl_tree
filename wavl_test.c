@@ -6,6 +6,7 @@
 #include <linux/uaccess.h>   
 #include <linux/string.h>
 #include "wavl_tree_augmented.h"
+#include <linux/log2.h>
 #define PROC_NAME "wavl_cmd"
 static int nodecount=0;
 
@@ -174,7 +175,7 @@ static void print_tree_inorder(struct rb_root *root) {
     }
     pr_info("=====================================\n");
 }
-static void print_tree_reverse(struct rb_root *root) {
+static void print_tree_reverse(struct rb_root *root) {#include <linux/log2.h>
     struct rb_node *node;
     pr_info("=== Reverse Inorder Result ===\n");
     for (node = rb_last(root); node; node = rb_prev(node)) {
@@ -183,7 +184,15 @@ static void print_tree_reverse(struct rb_root *root) {
     }
     pr_info("=====================================\n");
 }
-
+static int get_max_height(struct rb_node *node) {
+    int left_h, right_h;
+    if (!node) return 0;
+    
+    left_h = get_max_height(node->rb_left);
+    right_h = get_max_height(node->rb_right);
+    
+    return 1 + (left_h > right_h ? left_h : right_h);
+}
 
 static int verify_leftmost(struct rb_root_cached *root) {
     struct rb_node *curr = root->rb_root.rb_node;
@@ -260,7 +269,21 @@ static int verify_wavl_properties(struct rb_root_cached *root) {
         }
         count++;
     }
-
+    /* =========================================
+    * Property 5: WAVL height property
+    * ========================================= */
+    if (nodecount > 2) {
+        int current_height = get_max_height(root->rb_root.rb_node);
+        unsigned long max_allowed_height = 2 * ilog2(nodecount) + 2;
+        if (current_height > max_allowed_height) {
+            pr_err("[ERROR] Height Bound Violation! nodecount: %d, current_h: %d, max_allowed: %lu\n",
+                nodecount, current_height, max_allowed_height);
+            error = 1;
+        } else {
+            pr_info("  -> [Height Check] Current Height: %d, Theoretical Max: %lu (Nodes: %d)\n", 
+                    current_height, max_allowed_height, nodecount);
+        }
+    }
     if (verify_leftmost(root) != 0) error = 1;
     if (error) return -1; 
 
