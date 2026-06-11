@@ -242,12 +242,12 @@ void wavl_insert(struct rb_node *node, struct rb_root *root)
 {
 	__wavl_insert(node, root, dummy_rotate);
 }
-EXPORT_SYMBOL(wavl_insert);
+//EXPORT_SYMBOL(wavl_insert);
 void __wavl_erase(struct rb_node *parent, struct rb_root *root,void (*augment_rotate)(struct rb_node *old, struct rb_node *new))
 {
 	____wavl_erase(parent, root, augment_rotate);
 }
-EXPORT_SYMBOL(__wavl_erase);
+//EXPORT_SYMBOL(__wavl_erase);
 void wavl_erase(struct rb_node *node, struct rb_root *root)
 {
 	struct rb_node *rebalance;
@@ -255,14 +255,14 @@ void wavl_erase(struct rb_node *node, struct rb_root *root)
 	if (rebalance)
 		____wavl_erase(rebalance, root, dummy_rotate);
 }
-EXPORT_SYMBOL(wavl_erase);
+//EXPORT_SYMBOL(wavl_erase);
 
 void __wavl_insert_augmented(struct rb_node *node, struct rb_root *root,
 	void (*augment_rotate)(struct rb_node *old, struct rb_node *new))
 {
 	__wavl_insert(node, root,augment_rotate);
 }
-EXPORT_SYMBOL(__wavl_insert_augmented);
+//EXPORT_SYMBOL(__wavl_insert_augmented);
 
 void wavl_replace_node(struct rb_node *victim, struct rb_node *new,
 		     struct rb_root *root)
@@ -300,4 +300,4 @@ void wavl_replace_node_rcu(struct rb_node *victim, struct rb_node *new,
 	 */
 	__wavl_change_child_rcu(victim, new, parent, root);
 }
-EXPORT_SYMBOL(wavl_replace_node_rcu);
+//EXPORT_SYMBOL(wavl_replace_node_rcu);
