@@ -60,7 +60,6 @@ noinline void my_rb_insert_wrapper(struct rb_node *node, struct rb_root *root,
             /*
             * Loop invariant: node is red.
             */
-            this_cpu_inc(baseline_path_length); //go up 1 layer every loop
             if (unlikely(!parent)) {
                 /*
                 * The inserted node is root. Either this is the
@@ -102,6 +101,7 @@ noinline void my_rb_insert_wrapper(struct rb_node *node, struct rb_root *root,
                     rb_set_parent_color(parent, gparent, RB_BLACK);
                     node = gparent;
                     parent = rb_parent(node);
+                    this_cpu_inc(baseline_path_length);
                     rb_set_parent_color(node, parent, RB_RED);
                     continue;
                 }
@@ -249,6 +249,7 @@ ____myrb_erase_color(struct rb_node *parent, struct rb_root *root,
 					 * if it was red, or by recursing at p.
 					 * p is red when coming from Case 1.
 					 */
+                    this_cpu_inc(baseline_path_length);
 					rb_set_parent_color(sibling, parent,
 							    RB_RED);
 					if (rb_is_red(parent))
@@ -536,7 +537,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf, size
         per_cpu(wavl_path_length, cpu) = 0;
     }
 
-    pr_info("[RB-Test] Randomly deleting %d nodes...\n", DELETE_OPERATIONS);
+    pr_info("[RB-Test] Deleting %d nodes...\n", DELETE_OPERATIONS);
     for (i = 0; i < DELETE_OPERATIONS; i++) {
         int target_idx = indices[i]; 
         
