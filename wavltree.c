@@ -44,12 +44,12 @@ static __always_inline void __wavl_insert(struct rb_node *node, struct rb_root *
 		}
         if (wavl_rank_diff(parent, node) != 0) //check 0 violation
         break;
-        this_cpu_inc(wavl_path_length);
         if(node==parent->rb_left){ //node on left
             sibling=parent->rb_right;
             if(wavl_rank_diff(parent, sibling)==1){
                 // 0,1 case go promote
                 wavl_promote(parent);
+                this_cpu_inc(wavl_path_length);
                 node=parent;
                 continue;
             }
@@ -91,6 +91,7 @@ static __always_inline void __wavl_insert(struct rb_node *node, struct rb_root *
             if(wavl_rank_diff(parent, sibling)==1){
                 // 0,1 case go promote
                 wavl_promote(parent);
+                this_cpu_inc(wavl_path_length);
                 node=parent;
                 continue;
             }
@@ -137,7 +138,6 @@ static __always_inline void ____wavl_erase(struct rb_node *rebalance_node, struc
         if (diff_l != 3 && diff_r != 3) {
             break;
         }
-        this_cpu_inc(wavl_path_length);
         bool x_on_left = (diff_l == 3);
         
         if (x_on_left) { //x on left
@@ -147,6 +147,7 @@ static __always_inline void ____wavl_erase(struct rb_node *rebalance_node, struc
             if (wavl_rank_diff(x, sibling) == 2) {
                 wavl_demote(x);       // demote p(x)
                 x = wavl_parent(x);   // keep check top layer
+                this_cpu_inc(wavl_path_length);
                 if (!x) break;
                 continue;
             }
@@ -157,6 +158,7 @@ static __always_inline void ____wavl_erase(struct rb_node *rebalance_node, struc
                 wavl_demote(x);       // demote p(x)
                 wavl_demote(sibling); // demote y
                 x = wavl_parent(x);   // keep check top layer
+                this_cpu_inc(wavl_path_length);
                 if (!x) break;
                 continue;
             }
@@ -196,6 +198,7 @@ static __always_inline void ____wavl_erase(struct rb_node *rebalance_node, struc
             if (wavl_rank_diff(x, sibling) == 2) {
                 wavl_demote(x);       
                 x = wavl_parent(x);   
+                this_cpu_inc(wavl_path_length);
                 if (!x) break;
                 continue;
             }
@@ -204,6 +207,7 @@ static __always_inline void ____wavl_erase(struct rb_node *rebalance_node, struc
                 wavl_rank_diff(sibling, sibling->rb_right) == 2) {
                 wavl_demote(x);       
                 wavl_demote(sibling); 
+                this_cpu_inc(wavl_path_length);
                 x = wavl_parent(x);   
                 if (!x) break;
                 continue;
