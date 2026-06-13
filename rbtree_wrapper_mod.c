@@ -156,6 +156,7 @@ noinline void my_rb_insert_wrapper(struct rb_node *node, struct rb_root *root,
                 tmp = gparent->rb_left;
                 if (tmp && rb_is_red(tmp)) {
                     /* Case 1 - color flips */
+                    this_cpu_inc(baseline_path_length);
                     rb_set_parent_color(tmp, gparent, RB_BLACK);
                     rb_set_parent_color(parent, gparent, RB_BLACK);
                     node = gparent;
@@ -207,7 +208,6 @@ ____myrb_erase_color(struct rb_node *parent, struct rb_root *root,
 		 * - All leaf paths going through parent and node have a
 		 *   black node count that is 1 lower than other leaf paths.
 		 */
-        this_cpu_inc(baseline_path_length);
 		sibling = parent->rb_right;
 		if (node != sibling) {	/* node == parent->rb_left */
 			if (rb_is_red(sibling)) {
