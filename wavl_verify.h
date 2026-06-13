@@ -127,10 +127,6 @@ static inline int verify_wavl_properties(struct rb_root_cached *root, int nodeco
         unsigned long rb_safe_threshold = 1UL << ((h_avl_limit + 1) / 2);
 
         pr_info("[Degradation Analysis]\n");
-        pr_info("  -> Historical Total Insertions (m): %lu\n", insertion_count);
-        pr_info("  -> Current Surviving Nodes (n): %d\n", nodecount);
-        pr_info("  -> AVL Ceiling Height: %d\n", h_avl_limit);
-        pr_info("  -> Red-Black Ceiling Height: %d\n", h_rb_limit);
 
         if (nodecount < rb_safe_threshold) {
             pr_info(">>> [DEGRADATION ALERT] The theoretical limits have crossed! <<<\n");
