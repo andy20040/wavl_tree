@@ -129,9 +129,9 @@ static __always_inline void ____wavl_erase(struct rb_node *rebalance_node, struc
         unsigned long diff_r = wavl_rank_diff(x, x->rb_right);
         // 2-2 leaf
         if (diff_l == 2 && diff_r == 2 && wavl_is_leaf(x)) {
-            this_cpu_inc(wavl_path_length);
             wavl_demote(x);
             x = wavl_parent(x);
+            this_cpu_inc(wavl_path_length);
             if (!x) break;
             continue;
         }
