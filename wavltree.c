@@ -38,13 +38,13 @@ static void wavl_rotate_right(struct rb_node *node, struct rb_root *root, void (
 static __always_inline void __wavl_insert(struct rb_node *node, struct rb_root *root,void (*augment_rotate)(struct rb_node *old, struct rb_node *new)) {
     struct rb_node *parent, *sibling;
     while(true){
-        this_cpu_inc(wavl_path_length);
         parent = wavl_parent(node);
         if (unlikely(!parent)) {
 			break;
 		}
         if (wavl_rank_diff(parent, node) != 0) //check 0 violation
         break;
+        this_cpu_inc(wavl_path_length);
         if(node==parent->rb_left){ //node on left
             sibling=parent->rb_right;
             if(wavl_rank_diff(parent, sibling)==1){
@@ -124,11 +124,11 @@ static __always_inline void ____wavl_erase(struct rb_node *rebalance_node, struc
     struct rb_node  *sibling;
 
     while (true) {
-        this_cpu_inc(wavl_path_length);
         unsigned long diff_l = wavl_rank_diff(x, x->rb_left);
         unsigned long diff_r = wavl_rank_diff(x, x->rb_right);
         // 2-2 leaf
         if (diff_l == 2 && diff_r == 2 && wavl_is_leaf(x)) {
+            this_cpu_inc(wavl_path_length);
             wavl_demote(x);
             x = wavl_parent(x);
             if (!x) break;
@@ -137,7 +137,7 @@ static __always_inline void ____wavl_erase(struct rb_node *rebalance_node, struc
         if (diff_l != 3 && diff_r != 3) {
             break;
         }
-
+        this_cpu_inc(wavl_path_length);
         bool x_on_left = (diff_l == 3);
         
         if (x_on_left) { //x on left
