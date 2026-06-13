@@ -499,9 +499,11 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf, size
     pr_info("[RB-Test] Inserting %d nodes...\n", TOTAL_OPERATIONS);
     
     for (i = 0; i < TOTAL_OPERATIONS; i++) {
-        random_key = get_random_u32() % 1000000;
-        rb_nodes[i]  = insert_rb_node(random_key);   
-        wavl_nodes[i] = insert_wavl_node(random_key);
+        //random_key = get_random_u32() % 1000000;
+        //rb_nodes[i]  = insert_rb_node(random_key);   
+        rb_nodes[i]  = insert_rb_node(i);
+        //wavl_nodes[i] = insert_wavl_node(random_key);
+        wavl_nodes[i] = insert_wavl_node(i);
         indices[i] = i; 
     }
     
@@ -516,13 +518,13 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf, size
     /* ==========================================
      * shuffle
      * ========================================== */
-    for (i = TOTAL_OPERATIONS - 1; i > 0; i--) {
-        u32 j = get_random_u32() % (i + 1);
+    // for (i = TOTAL_OPERATIONS - 1; i > 0; i--) {
+    //     u32 j = get_random_u32() % (i + 1);
         
-        int temp = indices[i];
-        indices[i] = indices[j];
-        indices[j] = temp;
-    }
+    //     int temp = indices[i];
+    //     indices[i] = indices[j];
+    //     indices[j] = temp;
+    // }
 
     /* ==========================================
      * delete
