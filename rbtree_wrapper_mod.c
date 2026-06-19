@@ -502,7 +502,7 @@ static struct my_node* search_wavl_node(unsigned long long key) {
 
 
 
-static ssize_t rbtree_proc_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
+static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user, size_t count, loff_t *ppos)
 {
     char buf[32]; 
     size_t copy_len;
