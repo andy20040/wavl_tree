@@ -58,6 +58,7 @@ noinline void my_rb_insert_wrapper(struct rb_node *node, struct rb_root *root,
     struct rb_node *parent = rb_red_parent(node), *gparent, *tmp;
 
         while (true) {
+            this_cpu_inc(baseline_path_length);
             /*
             * Loop invariant: node is red.
             */
@@ -102,7 +103,6 @@ noinline void my_rb_insert_wrapper(struct rb_node *node, struct rb_root *root,
                     rb_set_parent_color(parent, gparent, RB_BLACK);
                     node = gparent;
                     parent = rb_parent(node);
-                    this_cpu_inc(baseline_path_length);
                     rb_set_parent_color(node, parent, RB_RED);
                     continue;
                 }
@@ -157,7 +157,6 @@ noinline void my_rb_insert_wrapper(struct rb_node *node, struct rb_root *root,
                 tmp = gparent->rb_left;
                 if (tmp && rb_is_red(tmp)) {
                     /* Case 1 - color flips */
-                    this_cpu_inc(baseline_path_length);
                     rb_set_parent_color(tmp, gparent, RB_BLACK);
                     rb_set_parent_color(parent, gparent, RB_BLACK);
                     node = gparent;
@@ -202,6 +201,7 @@ ____myrb_erase_color(struct rb_node *parent, struct rb_root *root,
 	struct rb_node *node = NULL, *sibling, *tmp1, *tmp2;
 
 	while (true) {
+        this_cpu_inc(baseline_path_length);
 		/*
 		 * Loop invariants:
 		 * - node is black (or NULL on first iteration)
@@ -250,7 +250,6 @@ ____myrb_erase_color(struct rb_node *parent, struct rb_root *root,
 					 * if it was red, or by recursing at p.
 					 * p is red when coming from Case 1.
 					 */
-                    this_cpu_inc(baseline_path_length);
 					rb_set_parent_color(sibling, parent,
 							    RB_RED);
 					if (rb_is_red(parent))
@@ -480,26 +479,6 @@ static struct my_node* search_wavl_node(unsigned long long key) {
     }
     return NULL;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user, size_t count, loff_t *ppos)
