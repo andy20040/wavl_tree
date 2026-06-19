@@ -103,6 +103,7 @@ noinline void my_rb_insert_wrapper(struct rb_node *node, struct rb_root *root,
                     node = gparent;
                     parent = rb_parent(node);
                     this_cpu_inc(baseline_path_length);
+                    this_cpu_inc(baseline_path_length);
                     rb_set_parent_color(node, parent, RB_RED);
                     continue;
                 }
@@ -157,6 +158,7 @@ noinline void my_rb_insert_wrapper(struct rb_node *node, struct rb_root *root,
                 tmp = gparent->rb_left;
                 if (tmp && rb_is_red(tmp)) {
                     /* Case 1 - color flips */
+                    this_cpu_inc(baseline_path_length);
                     this_cpu_inc(baseline_path_length);
                     rb_set_parent_color(tmp, gparent, RB_BLACK);
                     rb_set_parent_color(parent, gparent, RB_BLACK);
@@ -250,7 +252,6 @@ ____myrb_erase_color(struct rb_node *parent, struct rb_root *root,
 					 * if it was red, or by recursing at p.
 					 * p is red when coming from Case 1.
 					 */
-                    this_cpu_inc(baseline_path_length);
 					rb_set_parent_color(sibling, parent,
 							    RB_RED);
 					if (rb_is_red(parent))
@@ -258,6 +259,7 @@ ____myrb_erase_color(struct rb_node *parent, struct rb_root *root,
 					else {
 						node = parent;
 						parent = rb_parent(node);
+                        this_cpu_inc(baseline_path_length);
 						if (parent)
 							continue;
 					}
@@ -351,6 +353,7 @@ ____myrb_erase_color(struct rb_node *parent, struct rb_root *root,
 					else {
 						node = parent;
 						parent = rb_parent(node);
+                        this_cpu_inc(baseline_path_length);
 						if (parent)
 							continue;
 					}
@@ -588,10 +591,9 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         pr_info("Total Rotation Counts      | %9llu | %9llu\n", rb_rots, wavl_rots);
         pr_info("Total Rebalancing Path Len | %9llu | %9llu\n", rb_path, wavl_path);
         pr_info("==================================================\n");
-        pr_info("Total Delete Misses: %llu\n", delete_misses);
         pr_info("Total Inserts          : %llu\n", total_inserts);
         pr_info("Total Successful Delete  : %llu\n", total_deletes);
-        pr_info("Delete Misses : %llu\n", delete_misses);
+        pr_info("Total Delete Misses: %llu\n", delete_misses);
         struct my_node *pos, *n;
         rbtree_postorder_for_each_entry_safe(pos, n, &my_test_tree, node) {
             kfree(pos);
