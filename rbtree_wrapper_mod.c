@@ -585,6 +585,15 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         pr_info("Total Rebalancing Path Len | %9llu | %9llu\n", rb_path, wavl_path);
         pr_info("==================================================\n");
         pr_info("Total Delete Misses: %llu\n", delete_misses);
+        struct my_node *pos, *n;
+        rbtree_postorder_for_each_entry_safe(pos, n, &my_test_tree, node) {
+            kfree(pos);
+        }
+        rbtree_postorder_for_each_entry_safe(pos, n, &my_wavl_tree, node) {
+            kfree(pos);
+        }
+        my_wavl_tree = RB_ROOT;
+        my_test_tree = RB_ROOT;
     }
     else{
         if (!rb_nodes || !wavl_nodes || !indices) {
