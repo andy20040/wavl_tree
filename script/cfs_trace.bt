@@ -1,0 +1,17 @@
+#include <linux/sched.h>
+
+BEGIN {
+    printf("Recording CFS Scheduler (vruntime) Trace... Hit Ctrl-C to stop.\n");
+}
+
+
+kprobe:enqueue_task_fair {
+
+    $p = (struct task_struct *)arg1;
+    printf("I %llu\n", $p->se.vruntime);
+}
+
+kprobe:dequeue_task_fair {
+    $p = (struct task_struct *)arg1;
+    printf("D %llu\n", $p->se.vruntime);
+}

@@ -10,6 +10,7 @@
 #include "wavl_tree_augmented.h"
 #include <linux/vmalloc.h>
 #include "trace_data/timer_data.h"     
+#include "trace_data/cfs_data.h"
 #define PROC_NAME "rbtree_test_cmd"
 DEFINE_PER_CPU(u64, baseline_rotations);
 DEFINE_PER_CPU(u64, baseline_path_length);
@@ -533,7 +534,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
     struct my_node **rb_nodes = vmalloc(TOTAL_OPERATIONS * sizeof(struct my_node *));
     struct my_node **wavl_nodes = vmalloc(TOTAL_OPERATIONS * sizeof(struct my_node *));
     int *indices = kmalloc_array(TOTAL_OPERATIONS , sizeof(int), GFP_KERNEL); /* index for shuffle */
-    if (strcmp(buf, "real_trace") == 0) {
+    if (strcmp(buf, "timer_trace") == 0) {
         u64 rb_rots = 0, rb_path = 0;
         u64 wavl_rots = 0, wavl_path = 0;
         u64 delete_misses = 0;
@@ -603,6 +604,83 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         }
         my_wavl_tree = RB_ROOT;
         my_test_tree = RB_ROOT;
+    }
+    else if (strcmp(buf, "cfs_trace") == 0) {
+        rb_rots = 0;
+        rb_path = 0;
+        wavl_rots = 0;
+        wavl_path = 0;
+        delete_misses = 0;
+        total_inserts = 0; 
+        total_deletes = 0;
+        int i;
+        int WARMUP_COUNT = CFS_TRACE_SIZE / 5; 
+
+        pr_info("[RB-Test] Replaying CFS Scheduler Trace (%d ops)...\n", CFS_TRACE_SIZE);
+
+        for (i = 0; i < CFS_TRACE_SIZE; i++) {
+            unsigned long long key = cfs_trace_data[i].key; 
+
+            if (cfs_trace_data[i].is_insert) {
+                total_inserts++;
+                insert_rb_node(key);
+                insert_wavl_node(key);
+            } 
+            else {
+                struct my_node *rb_target = search_rb_node(key);
+                struct my_node *wavl_target = search_wavl_node(key);
+
+                if (rb_target && wavl_target) {
+                    total_deletes++;
+                    my_rb_erase(&rb_target->node, &my_test_tree);
+                    kfree(rb_target);
+                    
+                    wavl_erase(&wavl_target->node, &my_wavl_tree);
+                    kfree(wavl_target);
+                } else {
+                    delete_misses++; 
+                }
+            }
+            if (i == WARMUP_COUNT) {
+                for_each_possible_cpu(cpu) {
+                    per_cpu(baseline_rotations, cpu) = 0;
+                    per_cpu(baseline_path_length, cpu) = 0;
+                    per_cpu(wavl_rotations, cpu) = 0;
+                    per_cpu(wavl_path_length, cpu) = 0;
+                }
+            }
+        }
+        for_each_possible_cpu(cpu) {
+            rb_rots += per_cpu(baseline_rotations, cpu);
+            rb_path += per_cpu(baseline_path_length, cpu);
+            wavl_rots += per_cpu(wavl_rotations, cpu);
+            wavl_path += per_cpu(wavl_path_length, cpu);
+        }
+
+        pr_info("==================================================\n");
+        pr_info("          [ CFS Scheduler Trace Replay ]\n");
+        pr_info("==================================================\n");
+        pr_info("Metric                     |  RB Tree  | WAVL Tree\n");
+        pr_info("--------------------------------------------------\n");
+        pr_info("Total Rotation Counts      | %9llu | %9llu\n", rb_rots, wavl_rots);
+        pr_info("Total Rebalancing Path Len | %9llu | %9llu\n", rb_path, wavl_path);
+        pr_info("==================================================\n");
+        pr_info("          [ Workload Distribution ]\n");
+        pr_info("==================================================\n");
+        pr_info("Total Trace Size       : %d\n", CFS_TRACE_SIZE);
+        pr_info("Total Inserts          : %llu\n", total_inserts);
+        pr_info("Successful Deletes     : %llu\n", total_deletes );
+        pr_info("Delete Misses : %llu\n", delete_misses);
+        pr_info("==================================================\n");
+        struct my_node *pos, *n;
+        rbtree_postorder_for_each_entry_safe(pos, n, &my_test_tree, node) {
+            kfree(pos);
+        }
+        rbtree_postorder_for_each_entry_safe(pos, n, &my_wavl_tree, node) {
+            kfree(pos);
+        }
+        my_test_tree = RB_ROOT;
+        my_wavl_tree = RB_ROOT;
     }
     else{
         if (!rb_nodes || !wavl_nodes || !indices) {
