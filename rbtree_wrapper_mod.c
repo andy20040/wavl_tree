@@ -485,14 +485,14 @@ static struct my_node* search_wavl_node(unsigned long long key) {
     return NULL;
 }
 
-
-
-
-
-
-
-
-
+//random seed
+static u32 my_xorshift32(u32 *state) {
+    u32 x = *state;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    return *state = x;
+}
 
 
 
@@ -529,11 +529,6 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
     
     const int TOTAL_OPERATIONS = 10000;
     const int DELETE_OPERATIONS = 5000;
-    
-
-    struct my_node **rb_nodes = vmalloc(TOTAL_OPERATIONS * sizeof(struct my_node *));
-    struct my_node **wavl_nodes = vmalloc(TOTAL_OPERATIONS * sizeof(struct my_node *));
-    int *indices = kmalloc_array(TOTAL_OPERATIONS , sizeof(int), GFP_KERNEL); /* index for shuffle */
     if (strcmp(buf, "timer_trace") == 0) {
         u64 rb_rots = 0, rb_path = 0;
         u64 wavl_rots = 0, wavl_path = 0;
@@ -680,7 +675,12 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         my_test_tree = RB_ROOT;
         my_wavl_tree = RB_ROOT;
     }
-    else{
+    else if (strcmp(buf, "random") == 0 || strcmp(buf, "seq") == 0){
+        int is_random = (strcmp(buf, "random") == 0);
+        u32 prng_state = 123456789;
+        struct my_node **rb_nodes = vmalloc(TOTAL_OPERATIONS * sizeof(struct my_node *));
+        struct my_node **wavl_nodes = vmalloc(TOTAL_OPERATIONS * sizeof(struct my_node *));
+        int *indices = kmalloc_array(TOTAL_OPERATIONS , sizeof(int), GFP_KERNEL); /* index for shuffle */
         if (!rb_nodes || !wavl_nodes || !indices) {
             pr_err("Memory allocation failed!\n");
             
@@ -703,12 +703,10 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         pr_info("[RB-Test] Inserting %d nodes...\n", TOTAL_OPERATIONS);
         
         for (i = 0; i < TOTAL_OPERATIONS; i++) {
-            //random_key = get_random_u32() % 1000000;
-            //rb_nodes[i]  = insert_rb_node(random_key);   
-            rb_nodes[i]  = insert_rb_node(i);
-            //wavl_nodes[i] = insert_wavl_node(random_key);
-            wavl_nodes[i] = insert_wavl_node(i);
-            indices[i] = i; 
+            u64 key = is_random ? (my_xorshift32(&prng_state) % 1000000) : i;
+            rb_nodes[i]  = insert_rb_node(key);
+            wavl_nodes[i] = insert_wavl_node(key);
+            indices[i] = i;
         }
         
 
@@ -722,13 +720,15 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         /* ==========================================
         * shuffle
         * ========================================== */
-        // for (i = TOTAL_OPERATIONS - 1; i > 0; i--) {
-        //     u32 j = get_random_u32() % (i + 1);
-            
-        //     int temp = indices[i];
-        //     indices[i] = indices[j];
-        //     indices[j] = temp;
-        // }
+
+        if (is_random) {
+            for (i = TOTAL_OPERATIONS - 1; i > 0; i--) {
+                u32 j = my_xorshift32(&prng_state) % (i + 1);
+                int temp = indices[i];
+                indices[i] = indices[j];
+                indices[j] = temp;
+            }
+        }
 
         /* ==========================================
         * delete
@@ -763,7 +763,12 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
             wavl_del_rots += per_cpu(wavl_rotations, cpu);
             wavl_del_path += per_cpu(wavl_path_length, cpu);
         }
-
+        if(is_random){
+            pr_info("               [ Random Insert delete ]\n");
+        }
+        else{
+            pr_info("               [ Seqential Insert delete ]\n");
+        }
 
         pr_info("==================================================\n");
         pr_info("               [ Insert Phase ]\n");
