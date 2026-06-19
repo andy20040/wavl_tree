@@ -2,7 +2,7 @@
 #define _WAVL_VERIFY_H
 
 #include <linux/rbtree.h>
-#include <linux/log2.h>       // 給 ilog2() 使用
+#include <linux/log2.h>       
 #include "wavl_tree_augmented.h"
 
 
@@ -129,10 +129,10 @@ static inline int verify_wavl_properties(struct rb_root_cached *root, int nodeco
         pr_info("[Degradation Analysis]\n");
 
         if (nodecount < rb_safe_threshold) {
-            pr_info(">>> [DEGRADATION ALERT] The theoretical limits have crossed! <<<\n");
-            pr_info(">>> WAVL Tree has  degraded into the Red-Black Tree  <<<\n");
+            pr_info("[DEGRADATION ALERT] The theoretical limits have crossed! \n");
+            pr_info("[INFO]WAVL Tree has  degraded into the Red-Black Tree!!\n");
         } else {
-            pr_info(">>> [STATUS] WAVL Tree is still protected by AVL strictness bounds. <<<\n");
+            pr_info("[STATUS] WAVL Tree is still protected by AVL strictness bounds.\n");
         }
     }
 

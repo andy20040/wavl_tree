@@ -9,6 +9,7 @@
 #include <linux/rbtree_augmented.h>
 #include "wavl_tree_augmented.h"
 #include <linux/vmalloc.h>
+#include "trace_data.h"     
 #define PROC_NAME "rbtree_test_cmd"
 DEFINE_PER_CPU(u64, baseline_rotations);
 DEFINE_PER_CPU(u64, baseline_path_length);
@@ -457,6 +458,49 @@ static struct my_node* insert_rb_node(int key) //rbtree
     my_rb_insert_color(&data->node, &my_test_tree);
     return data;
 }
+//for record
+static struct my_node* search_rb_node(unsigned long long key) {
+    struct rb_node *node = my_test_tree.rb_node;
+    while (node) {
+        struct my_node *data = container_of(node, struct my_node, node);
+        if (key < data->key) node = node->rb_left;
+        else if (key > data->key) node = node->rb_right;
+        else return data;
+    }
+    return NULL;
+}
+
+static struct my_node* search_wavl_node(unsigned long long key) {
+    struct rb_node *node = my_wavl_tree.rb_node;
+    while (node) {
+        struct my_node *data = container_of(node, struct my_node, node);
+        if (key < data->key) node = node->rb_left;
+        else if (key > data->key) node = node->rb_right;
+        else return data;
+    }
+    return NULL;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 static ssize_t rbtree_proc_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
@@ -478,127 +522,184 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf, size
     struct my_node **rb_nodes = vmalloc(TOTAL_OPERATIONS * sizeof(struct my_node *));
     struct my_node **wavl_nodes = vmalloc(TOTAL_OPERATIONS * sizeof(struct my_node *));
     int *indices = kmalloc_array(TOTAL_OPERATIONS , sizeof(int), GFP_KERNEL); /* index for shuffle */
-    if (!rb_nodes || !wavl_nodes || !indices) {
-        pr_err("Memory allocation failed!\n");
-        
-        if (rb_nodes) vfree(rb_nodes);
-        if (wavl_nodes) vfree(wavl_nodes);
-        if (indices) kfree(indices); 
-        
-        return -ENOMEM; 
-    }
-    /* ==========================================
-     * Insert 
-     * ========================================== */
-    for_each_possible_cpu(cpu) {
-        per_cpu(baseline_rotations, cpu) = 0;
-        per_cpu(baseline_path_length, cpu) = 0;
-        per_cpu(wavl_rotations, cpu) = 0;
-        per_cpu(wavl_path_length, cpu) = 0;
-    }
+    if (strcmp(buf, "real_trace") == 0) {
+        u64 rb_rots = 0, rb_path = 0;
+        u64 wavl_rots = 0, wavl_path = 0;
+        int i;
 
-    pr_info("[RB-Test] Inserting %d nodes...\n", TOTAL_OPERATIONS);
-    
-    for (i = 0; i < TOTAL_OPERATIONS; i++) {
-        //random_key = get_random_u32() % 1000000;
-        //rb_nodes[i]  = insert_rb_node(random_key);   
-        rb_nodes[i]  = insert_rb_node(i);
-        //wavl_nodes[i] = insert_wavl_node(random_key);
-        wavl_nodes[i] = insert_wavl_node(i);
-        indices[i] = i; 
-    }
-    
+        pr_info("[RB-Test] Replaying Real Kernel Trace (%d ops)...\n", TRACE_SIZE);
 
-    for_each_possible_cpu(cpu) {
-        rb_ins_rots += per_cpu(baseline_rotations, cpu);
-        rb_ins_path += per_cpu(baseline_path_length, cpu);
-        wavl_ins_rots += per_cpu(wavl_rotations, cpu);
-        wavl_ins_path += per_cpu(wavl_path_length, cpu);
-    }
-
-    /* ==========================================
-     * shuffle
-     * ========================================== */
-    // for (i = TOTAL_OPERATIONS - 1; i > 0; i--) {
-    //     u32 j = get_random_u32() % (i + 1);
-        
-    //     int temp = indices[i];
-    //     indices[i] = indices[j];
-    //     indices[j] = temp;
-    // }
-
-    /* ==========================================
-     * delete
-     * ========================================== */
-    for_each_possible_cpu(cpu) {
-        per_cpu(baseline_rotations, cpu) = 0;
-        per_cpu(baseline_path_length, cpu) = 0;
-        per_cpu(wavl_rotations, cpu) = 0;
-        per_cpu(wavl_path_length, cpu) = 0;
-    }
-
-    pr_info("[RB-Test] Deleting %d nodes...\n", DELETE_OPERATIONS);
-    for (i = 0; i < DELETE_OPERATIONS; i++) {
-        int target_idx = indices[i]; 
-        
-        if (rb_nodes[target_idx]) {
-            my_rb_erase(&rb_nodes[target_idx]->node, &my_test_tree);
-            kfree(rb_nodes[target_idx]);
-            rb_nodes[target_idx] = NULL;
+        // 重置 per_cpu 統計資料
+        for_each_possible_cpu(cpu) {
+            per_cpu(baseline_rotations, cpu) = 0;
+            per_cpu(baseline_path_length, cpu) = 0;
+            per_cpu(wavl_rotations, cpu) = 0;
+            per_cpu(wavl_path_length, cpu) = 0;
         }
-        if (wavl_nodes[target_idx]) {
-            wavl_erase(&wavl_nodes[target_idx]->node, &my_wavl_tree);
-            kfree(wavl_nodes[target_idx]);
-            wavl_nodes[target_idx] = NULL;
+
+        // 迴圈執行 Trace
+        for (i = 0; i < TRACE_SIZE; i++) {
+            unsigned long long key = real_trace[i].key;
+
+            if (real_trace[i].is_insert) {
+                insert_rb_node(key);
+                insert_wavl_node(key);
+            } else {
+                // 刪除操作：先找、再刪、再釋放記憶體
+                struct my_node *rb_target = search_rb_node(key);
+                if (rb_target) {
+                    my_rb_erase(&rb_target->node, &my_test_tree);
+                    kfree(rb_target);
+                }
+
+                struct my_node *wavl_target = search_wavl_node(key);
+                if (wavl_target) {
+                    wavl_erase(&wavl_target->node, &my_wavl_tree);
+                    kfree(wavl_target);
+                }
+            }
         }
+
+        // 收集數據
+        for_each_possible_cpu(cpu) {
+            rb_rots += per_cpu(baseline_rotations, cpu);
+            rb_path += per_cpu(baseline_path_length, cpu);
+            wavl_rots += per_cpu(wavl_rotations, cpu);
+            wavl_path += per_cpu(wavl_path_length, cpu);
+        }
+
+        pr_info("==================================================\n");
+        pr_info("          [ Real Kernel Trace Replay ]\n");
+        pr_info("==================================================\n");
+        pr_info("Metric                     |  RB Tree  | WAVL Tree\n");
+        pr_info("--------------------------------------------------\n");
+        pr_info("Total Rotation Counts      | %9llu | %9llu\n", rb_rots, wavl_rots);
+        pr_info("Total Rebalancing Path Len | %9llu | %9llu\n", rb_path, wavl_path);
+        pr_info("==================================================\n");
     }
+    else{
+        if (!rb_nodes || !wavl_nodes || !indices) {
+            pr_err("Memory allocation failed!\n");
+            
+            if (rb_nodes) vfree(rb_nodes);
+            if (wavl_nodes) vfree(wavl_nodes);
+            if (indices) kfree(indices); 
+            
+            return -ENOMEM; 
+        }
+        /* ==========================================
+        * Insert 
+        * ========================================== */
+        for_each_possible_cpu(cpu) {
+            per_cpu(baseline_rotations, cpu) = 0;
+            per_cpu(baseline_path_length, cpu) = 0;
+            per_cpu(wavl_rotations, cpu) = 0;
+            per_cpu(wavl_path_length, cpu) = 0;
+        }
+
+        pr_info("[RB-Test] Inserting %d nodes...\n", TOTAL_OPERATIONS);
+        
+        for (i = 0; i < TOTAL_OPERATIONS; i++) {
+            //random_key = get_random_u32() % 1000000;
+            //rb_nodes[i]  = insert_rb_node(random_key);   
+            rb_nodes[i]  = insert_rb_node(i);
+            //wavl_nodes[i] = insert_wavl_node(random_key);
+            wavl_nodes[i] = insert_wavl_node(i);
+            indices[i] = i; 
+        }
+        
+
+        for_each_possible_cpu(cpu) {
+            rb_ins_rots += per_cpu(baseline_rotations, cpu);
+            rb_ins_path += per_cpu(baseline_path_length, cpu);
+            wavl_ins_rots += per_cpu(wavl_rotations, cpu);
+            wavl_ins_path += per_cpu(wavl_path_length, cpu);
+        }
+
+        /* ==========================================
+        * shuffle
+        * ========================================== */
+        // for (i = TOTAL_OPERATIONS - 1; i > 0; i--) {
+        //     u32 j = get_random_u32() % (i + 1);
+            
+        //     int temp = indices[i];
+        //     indices[i] = indices[j];
+        //     indices[j] = temp;
+        // }
+
+        /* ==========================================
+        * delete
+        * ========================================== */
+        for_each_possible_cpu(cpu) {
+            per_cpu(baseline_rotations, cpu) = 0;
+            per_cpu(baseline_path_length, cpu) = 0;
+            per_cpu(wavl_rotations, cpu) = 0;
+            per_cpu(wavl_path_length, cpu) = 0;
+        }
+
+        pr_info("[RB-Test] Deleting %d nodes...\n", DELETE_OPERATIONS);
+        for (i = 0; i < DELETE_OPERATIONS; i++) {
+            int target_idx = indices[i]; 
+            
+            if (rb_nodes[target_idx]) {
+                my_rb_erase(&rb_nodes[target_idx]->node, &my_test_tree);
+                kfree(rb_nodes[target_idx]);
+                rb_nodes[target_idx] = NULL;
+            }
+            if (wavl_nodes[target_idx]) {
+                wavl_erase(&wavl_nodes[target_idx]->node, &my_wavl_tree);
+                kfree(wavl_nodes[target_idx]);
+                wavl_nodes[target_idx] = NULL;
+            }
+        }
 
 
-    for_each_possible_cpu(cpu) {
-        rb_del_rots += per_cpu(baseline_rotations, cpu);
-        rb_del_path += per_cpu(baseline_path_length, cpu);
-        wavl_del_rots += per_cpu(wavl_rotations, cpu);
-        wavl_del_path += per_cpu(wavl_path_length, cpu);
+        for_each_possible_cpu(cpu) {
+            rb_del_rots += per_cpu(baseline_rotations, cpu);
+            rb_del_path += per_cpu(baseline_path_length, cpu);
+            wavl_del_rots += per_cpu(wavl_rotations, cpu);
+            wavl_del_path += per_cpu(wavl_path_length, cpu);
+        }
+
+
+        pr_info("==================================================\n");
+        pr_info("               [ Insert Phase ]\n");
+        pr_info("==================================================\n");
+        pr_info("Metric                     |  RB Tree  | WAVL Tree\n");
+        pr_info("--------------------------------------------------\n");
+        pr_info("Total Rotation Counts      | %9llu | %9llu\n", rb_ins_rots, wavl_ins_rots);
+        pr_info("Average Rotation Counts    | %5llu.%03llu | %5llu.%03llu\n", 
+                rb_ins_rots / TOTAL_OPERATIONS, ((rb_ins_rots * 1000) / TOTAL_OPERATIONS) % 1000,
+                wavl_ins_rots / TOTAL_OPERATIONS, ((wavl_ins_rots * 1000) / TOTAL_OPERATIONS) % 1000);
+        pr_info("Total Rebalancing Path Len | %9llu | %9llu\n", rb_ins_path, wavl_ins_path);
+
+        pr_info("==================================================\n");
+        pr_info("               [ Delete Phase ]\n");
+        pr_info("==================================================\n");
+        pr_info("Metric                     |  RB Tree  | WAVL Tree\n");
+        pr_info("--------------------------------------------------\n");
+        pr_info("Total Rotation Counts      | %9llu | %9llu\n", rb_del_rots, wavl_del_rots);
+        pr_info("Average Rotation Counts    | %5llu.%03llu | %5llu.%03llu\n", 
+                rb_del_rots / DELETE_OPERATIONS, ((rb_del_rots * 1000) / DELETE_OPERATIONS) % 1000,
+                wavl_del_rots / DELETE_OPERATIONS, ((wavl_del_rots * 1000) / DELETE_OPERATIONS) % 1000);
+        pr_info("Total Rebalancing Path Len | %9llu | %9llu\n", rb_del_path, wavl_del_path);
+        pr_info("==================================================\n");
+
+
+        vfree(rb_nodes);
+        vfree(wavl_nodes);
+        kfree(indices);
+
+        struct my_node *pos, *n;
+        rbtree_postorder_for_each_entry_safe(pos, n, &my_test_tree, node) {
+            kfree(pos);
+        }
+        rbtree_postorder_for_each_entry_safe(pos, n, &my_wavl_tree, node) {
+            kfree(pos);
+        }
+        my_wavl_tree = RB_ROOT;
+        my_test_tree = RB_ROOT;
     }
-
-
-    pr_info("==================================================\n");
-    pr_info("               [ Insert Phase ]\n");
-    pr_info("==================================================\n");
-    pr_info("Metric                     |  RB Tree  | WAVL Tree\n");
-    pr_info("--------------------------------------------------\n");
-    pr_info("Total Rotation Counts      | %9llu | %9llu\n", rb_ins_rots, wavl_ins_rots);
-    pr_info("Average Rotation Counts    | %5llu.%03llu | %5llu.%03llu\n", 
-            rb_ins_rots / TOTAL_OPERATIONS, ((rb_ins_rots * 1000) / TOTAL_OPERATIONS) % 1000,
-            wavl_ins_rots / TOTAL_OPERATIONS, ((wavl_ins_rots * 1000) / TOTAL_OPERATIONS) % 1000);
-    pr_info("Total Rebalancing Path Len | %9llu | %9llu\n", rb_ins_path, wavl_ins_path);
-
-    pr_info("==================================================\n");
-    pr_info("               [ Delete Phase ]\n");
-    pr_info("==================================================\n");
-    pr_info("Metric                     |  RB Tree  | WAVL Tree\n");
-    pr_info("--------------------------------------------------\n");
-    pr_info("Total Rotation Counts      | %9llu | %9llu\n", rb_del_rots, wavl_del_rots);
-    pr_info("Average Rotation Counts    | %5llu.%03llu | %5llu.%03llu\n", 
-            rb_del_rots / DELETE_OPERATIONS, ((rb_del_rots * 1000) / DELETE_OPERATIONS) % 1000,
-            wavl_del_rots / DELETE_OPERATIONS, ((wavl_del_rots * 1000) / DELETE_OPERATIONS) % 1000);
-    pr_info("Total Rebalancing Path Len | %9llu | %9llu\n", rb_del_path, wavl_del_path);
-    pr_info("==================================================\n");
-
-
-    vfree(rb_nodes);
-    vfree(wavl_nodes);
-    kfree(indices);
-
-    struct my_node *pos, *n;
-    rbtree_postorder_for_each_entry_safe(pos, n, &my_test_tree, node) {
-        kfree(pos);
-    }
-    rbtree_postorder_for_each_entry_safe(pos, n, &my_wavl_tree, node) {
-        kfree(pos);
-    }
-    my_wavl_tree = RB_ROOT;
-    my_test_tree = RB_ROOT;
     return count;
 }
 
