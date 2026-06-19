@@ -533,6 +533,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
     if (strcmp(buf, "real_trace") == 0) {
         u64 rb_rots = 0, rb_path = 0;
         u64 wavl_rots = 0, wavl_path = 0;
+        u64 delete_misses = 0;
         int i;
         int WARMUP_COUNT = TRACE_SIZE / 5;
         pr_info("[RB-Test] Replaying Real Kernel Trace (%d ops)...\n", TRACE_SIZE);
@@ -546,15 +547,16 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
             } 
             else {
                 struct my_node *rb_target = search_rb_node(key);
-                if (rb_target) {
+                struct my_node *wavl_target = search_wavl_node(key);
+
+                if (rb_target && wavl_target) { // found
                     my_rb_erase(&rb_target->node, &my_test_tree);
                     kfree(rb_target);
-                }
-
-                struct my_node *wavl_target = search_wavl_node(key);
-                if (wavl_target) {
+                    
                     wavl_erase(&wavl_target->node, &my_wavl_tree);
                     kfree(wavl_target);
+                } else {
+                    delete_misses++; //not found
                 }
             }
             if (i == WARMUP_COUNT) {
@@ -582,6 +584,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         pr_info("Total Rotation Counts      | %9llu | %9llu\n", rb_rots, wavl_rots);
         pr_info("Total Rebalancing Path Len | %9llu | %9llu\n", rb_path, wavl_path);
         pr_info("==================================================\n");
+        pr_info("Total Delete Misses: %llu\n", delete_misses);
     }
     else{
         if (!rb_nodes || !wavl_nodes || !indices) {
