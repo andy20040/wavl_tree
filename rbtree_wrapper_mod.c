@@ -9,7 +9,7 @@
 #include <linux/rbtree_augmented.h>
 #include "wavl_tree_augmented.h"
 #include <linux/vmalloc.h>
-#include "trace_data.h"     
+#include "trace_data/timer_data.h"     
 #define PROC_NAME "rbtree_test_cmd"
 DEFINE_PER_CPU(u64, baseline_rotations);
 DEFINE_PER_CPU(u64, baseline_path_length);
@@ -526,26 +526,17 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf, size
         u64 rb_rots = 0, rb_path = 0;
         u64 wavl_rots = 0, wavl_path = 0;
         int i;
-
+        int WARMUP_COUNT = TRACE_SIZE / 5;
         pr_info("[RB-Test] Replaying Real Kernel Trace (%d ops)...\n", TRACE_SIZE);
 
-        // 重置 per_cpu 統計資料
-        for_each_possible_cpu(cpu) {
-            per_cpu(baseline_rotations, cpu) = 0;
-            per_cpu(baseline_path_length, cpu) = 0;
-            per_cpu(wavl_rotations, cpu) = 0;
-            per_cpu(wavl_path_length, cpu) = 0;
-        }
-
-        // 迴圈執行 Trace
         for (i = 0; i < TRACE_SIZE; i++) {
             unsigned long long key = real_trace[i].key;
 
             if (real_trace[i].is_insert) {
                 insert_rb_node(key);
                 insert_wavl_node(key);
-            } else {
-                // 刪除操作：先找、再刪、再釋放記憶體
+            } 
+            else {
                 struct my_node *rb_target = search_rb_node(key);
                 if (rb_target) {
                     my_rb_erase(&rb_target->node, &my_test_tree);
@@ -558,9 +549,16 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf, size
                     kfree(wavl_target);
                 }
             }
+            if (i == WARMUP_COUNT) {
+                for_each_possible_cpu(cpu) {
+                    per_cpu(baseline_rotations, cpu) = 0;
+                    per_cpu(baseline_path_length, cpu) = 0;
+                    per_cpu(wavl_rotations, cpu) = 0;
+                    per_cpu(wavl_path_length, cpu) = 0;
+                }
+            }
         }
 
-        // 收集數據
         for_each_possible_cpu(cpu) {
             rb_rots += per_cpu(baseline_rotations, cpu);
             rb_path += per_cpu(baseline_path_length, cpu);
