@@ -504,7 +504,15 @@ static struct my_node* search_wavl_node(unsigned long long key) {
 
 static ssize_t rbtree_proc_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
-    int i, cpu;
+    char buf[32]; 
+    size_t copy_len;
+    int cpu, i; 
+    copy_len = (count < sizeof(buf)) ? count : (sizeof(buf) - 1);
+    if (copy_from_user(buf, buf_user, copy_len)) {
+        return -EFAULT;
+    }
+    buf[copy_len] = '\0';
+    strim(buf);
     u32 random_key;
     
     /*  Insert  */
