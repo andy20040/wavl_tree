@@ -17,7 +17,7 @@ struct rb_root my_test_tree = RB_ROOT; //rbtree
 struct rb_root my_wavl_tree = RB_ROOT; //wavl_tree
 
 struct my_node {
-    int key;
+    unsigned long long key;
     struct rb_node node;
 };
 static inline void dummy_propagate(struct rb_node *node, struct rb_node *stop) {}
@@ -417,7 +417,7 @@ static void my_rb_insert_color(struct rb_node *node, struct rb_root *root)
 {
 	my_rb_insert_wrapper(node, root, dummy_rotate);
 }
-static struct my_node* insert_wavl_node(int key)
+static struct my_node* insert_wavl_node(unsigned long long key)
 {
     struct rb_node **new = &(my_wavl_tree.rb_node), *parent = NULL;
     struct my_node *data = kmalloc(sizeof(struct my_node), GFP_KERNEL);
@@ -435,7 +435,7 @@ static struct my_node* insert_wavl_node(int key)
     wavl_insert(&data->node, &my_wavl_tree); 
     return data;
 }
-static struct my_node* insert_rb_node(int key) //rbtree
+static struct my_node* insert_rb_node(unsigned long long key) //rbtree
 {
     struct rb_node **new = &(my_test_tree.rb_node), *parent = NULL;
     struct my_node *data = kmalloc(sizeof(struct my_node), GFP_KERNEL);
