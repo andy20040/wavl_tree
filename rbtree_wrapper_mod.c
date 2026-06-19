@@ -534,6 +534,8 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         u64 rb_rots = 0, rb_path = 0;
         u64 wavl_rots = 0, wavl_path = 0;
         u64 delete_misses = 0;
+        u64 total_inserts = 0; 
+        u64 total_deletes = 0;
         int i;
         int WARMUP_COUNT = TRACE_SIZE / 5;
         pr_info("[RB-Test] Replaying Real Kernel Trace (%d ops)...\n", TRACE_SIZE);
@@ -542,6 +544,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
             unsigned long long key = real_trace[i].key;
 
             if (real_trace[i].is_insert) {
+                total_inserts++;
                 insert_rb_node(key);
                 insert_wavl_node(key);
             } 
@@ -550,6 +553,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
                 struct my_node *wavl_target = search_wavl_node(key);
 
                 if (rb_target && wavl_target) { // found
+                    total_deletes++;
                     my_rb_erase(&rb_target->node, &my_test_tree);
                     kfree(rb_target);
                     
@@ -585,6 +589,9 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         pr_info("Total Rebalancing Path Len | %9llu | %9llu\n", rb_path, wavl_path);
         pr_info("==================================================\n");
         pr_info("Total Delete Misses: %llu\n", delete_misses);
+        pr_info("Total Inserts          : %llu\n", total_inserts);
+        pr_info("Total Successful Delete  : %llu\n", total_deletes);
+        pr_info("Delete Misses : %llu\n", delete_misses);
         struct my_node *pos, *n;
         rbtree_postorder_for_each_entry_safe(pos, n, &my_test_tree, node) {
             kfree(pos);
