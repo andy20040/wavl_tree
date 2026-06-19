@@ -606,13 +606,11 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         my_test_tree = RB_ROOT;
     }
     else if (strcmp(buf, "cfs_trace") == 0) {
-        rb_rots = 0;
-        rb_path = 0;
-        wavl_rots = 0;
-        wavl_path = 0;
-        delete_misses = 0;
-        total_inserts = 0; 
-        total_deletes = 0;
+        u64 rb_rots = 0, rb_path = 0;
+        u64 wavl_rots = 0, wavl_path = 0;
+        u64 delete_misses = 0;
+        u64 total_inserts = 0; 
+        u64 total_deletes = 0;
         int i;
         int WARMUP_COUNT = CFS_TRACE_SIZE / 5; 
 
