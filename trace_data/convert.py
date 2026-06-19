@@ -1,8 +1,8 @@
 # convert.py
 import sys
 
-input_file = "timer_trace.txt"
-output_file = "timer_data.h"
+input_file = "cfs_trace.txt"
+output_file = "cfs_data.h"
 max_ops = 10000  # data count
 
 try:
