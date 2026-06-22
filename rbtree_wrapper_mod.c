@@ -547,8 +547,19 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
 
             if (real_trace[i].is_insert) {
                 total_inserts++;
+                //  RB Tree Insert 
+                old_rots = 0; for_each_possible_cpu(cpu) old_rots += per_cpu(baseline_rotations, cpu);
                 insert_rb_node(key);
+                new_rots = 0; for_each_possible_cpu(cpu) new_rots += per_cpu(baseline_rotations, cpu);
+                diff = new_rots - old_rots;
+                rb_ins_hist[diff > 3 ? 3 : diff]++; 
+
+                //  WAVL Tree Insert 
+                old_rots = 0; for_each_possible_cpu(cpu) old_rots += per_cpu(wavl_rotations, cpu);
                 insert_wavl_node(key);
+                new_rots = 0; for_each_possible_cpu(cpu) new_rots += per_cpu(wavl_rotations, cpu);
+                diff = new_rots - old_rots;
+                wavl_ins_hist[diff > 3 ? 3 : diff]++;
             } 
             else {
                 struct my_node *rb_target = search_rb_node(key);
@@ -556,11 +567,22 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
 
                 if (rb_target && wavl_target) { // found
                     total_deletes++;
+                    
+                    //  RB Tree Delete 
+                    old_rots = 0; for_each_possible_cpu(cpu) old_rots += per_cpu(baseline_rotations, cpu);
                     my_rb_erase(&rb_target->node, &my_test_tree);
                     kfree(rb_target);
+                    new_rots = 0; for_each_possible_cpu(cpu) new_rots += per_cpu(baseline_rotations, cpu);
+                    diff = new_rots - old_rots;
+                    rb_del_hist[diff > 3 ? 3 : diff]++;
                     
+                    // WAVL Tree Delete 
+                    old_rots = 0; for_each_possible_cpu(cpu) old_rots += per_cpu(wavl_rotations, cpu);
                     wavl_erase(&wavl_target->node, &my_wavl_tree);
                     kfree(wavl_target);
+                    new_rots = 0; for_each_possible_cpu(cpu) new_rots += per_cpu(wavl_rotations, cpu);
+                    diff = new_rots - old_rots;
+                    wavl_del_hist[diff > 3 ? 3 : diff]++;
                 } else {
                     delete_misses++; //not found
                 }
@@ -572,6 +594,10 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
                     per_cpu(wavl_rotations, cpu) = 0;
                     per_cpu(wavl_path_length, cpu) = 0;
                 }
+                memset(rb_ins_hist, 0, sizeof(rb_ins_hist));
+                memset(wavl_ins_hist, 0, sizeof(wavl_ins_hist));
+                memset(rb_del_hist, 0, sizeof(rb_del_hist));
+                memset(wavl_del_hist, 0, sizeof(wavl_del_hist));
             }
         }
 
@@ -590,9 +616,30 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         pr_info("Total Rotation Counts      | %9llu | %9llu\n", rb_rots, wavl_rots);
         pr_info("Total Rebalancing Path Len | %9llu | %9llu\n", rb_path, wavl_path);
         pr_info("==================================================\n");
+        pr_info("          [ Workload Distribution ]\n");
+        pr_info("==================================================\n");
         pr_info("Total Inserts          : %llu\n", total_inserts);
         pr_info("Total Successful Delete  : %llu\n", total_deletes);
         pr_info("Total Delete Misses: %llu\n", delete_misses);
+        pr_info("==================================================\n");
+        pr_info("       [ Insert Operations Cost  ]\n");
+        pr_info("==================================================\n");
+        pr_info("Rotations |      RB Tree      |     WAVL Tree\n");
+        pr_info("--------------------------------------------------\n");
+        pr_info("  0 rots  | %17llu | %17llu\n", rb_ins_hist[0], wavl_ins_hist[0]);
+        pr_info("  1 rots  | %17llu | %17llu\n", rb_ins_hist[1], wavl_ins_hist[1]);
+        pr_info("  2 rots  | %17llu | %17llu\n", rb_ins_hist[2], wavl_ins_hist[2]);
+        pr_info(" >=3 rots | %17llu | %17llu\n", rb_ins_hist[3], wavl_ins_hist[3]);
+        pr_info("==================================================\n");
+        pr_info("       [ Delete Operations Cost  ]\n");
+        pr_info("==================================================\n");
+        pr_info("Rotations |      RB Tree      |     WAVL Tree\n");
+        pr_info("--------------------------------------------------\n");
+        pr_info("  0 rots  | %17llu | %17llu\n", rb_del_hist[0], wavl_del_hist[0]);
+        pr_info("  1 rots  | %17llu | %17llu\n", rb_del_hist[1], wavl_del_hist[1]);
+        pr_info("  2 rots  | %17llu | %17llu\n", rb_del_hist[2], wavl_del_hist[2]);
+        pr_info(" >=3 rots | %17llu | %17llu\n", rb_del_hist[3], wavl_del_hist[3]);
+        pr_info("==================================================\n");
         struct my_node *pos, *n;
         rbtree_postorder_for_each_entry_safe(pos, n, &my_test_tree, node) {
             kfree(pos);
@@ -619,8 +666,19 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
 
             if (cfs_trace_data[i].is_insert) {
                 total_inserts++;
+
+                old_rots = 0; for_each_possible_cpu(cpu) old_rots += per_cpu(baseline_rotations, cpu);
                 insert_rb_node(key);
+                new_rots = 0; for_each_possible_cpu(cpu) new_rots += per_cpu(baseline_rotations, cpu);
+                diff = new_rots - old_rots;
+                rb_ins_hist[diff > 3 ? 3 : diff]++; 
+
+
+                old_rots = 0; for_each_possible_cpu(cpu) old_rots += per_cpu(wavl_rotations, cpu);
                 insert_wavl_node(key);
+                new_rots = 0; for_each_possible_cpu(cpu) new_rots += per_cpu(wavl_rotations, cpu);
+                diff = new_rots - old_rots;
+                wavl_ins_hist[diff > 3 ? 3 : diff]++;
             } 
             else {
                 struct my_node *rb_target = search_rb_node(key);
@@ -628,11 +686,18 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
 
                 if (rb_target && wavl_target) {
                     total_deletes++;
+                    old_rots = 0; for_each_possible_cpu(cpu) old_rots += per_cpu(baseline_rotations, cpu);
                     my_rb_erase(&rb_target->node, &my_test_tree);
                     kfree(rb_target);
-                    
+                    new_rots = 0; for_each_possible_cpu(cpu) new_rots += per_cpu(baseline_rotations, cpu);
+                    diff = new_rots - old_rots;
+                    rb_del_hist[diff > 3 ? 3 : diff]++;
+                    old_rots = 0; for_each_possible_cpu(cpu) old_rots += per_cpu(wavl_rotations, cpu);
                     wavl_erase(&wavl_target->node, &my_wavl_tree);
                     kfree(wavl_target);
+                    new_rots = 0; for_each_possible_cpu(cpu) new_rots += per_cpu(wavl_rotations, cpu);
+                    diff = new_rots - old_rots;
+                    wavl_del_hist[diff > 3 ? 3 : diff]++;
                 } else {
                     delete_misses++; 
                 }
@@ -644,6 +709,10 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
                     per_cpu(wavl_rotations, cpu) = 0;
                     per_cpu(wavl_path_length, cpu) = 0;
                 }
+                memset(rb_ins_hist, 0, sizeof(rb_ins_hist));
+                memset(wavl_ins_hist, 0, sizeof(wavl_ins_hist));
+                memset(rb_del_hist, 0, sizeof(rb_del_hist));
+                memset(wavl_del_hist, 0, sizeof(wavl_del_hist));
             }
         }
         for_each_possible_cpu(cpu) {
@@ -667,6 +736,24 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         pr_info("Total Inserts          : %llu\n", total_inserts);
         pr_info("Successful Deletes     : %llu\n", total_deletes );
         pr_info("Delete Misses : %llu\n", delete_misses);
+        pr_info("==================================================\n");
+        pr_info("         [ Insert Operations Cost  ]\n");
+        pr_info("==================================================\n");
+        pr_info("Rotations |      RB Tree      |     WAVL Tree\n");
+        pr_info("--------------------------------------------------\n");
+        pr_info("  0 rots  | %17llu | %17llu\n", rb_ins_hist[0], wavl_ins_hist[0]);
+        pr_info("  1 rots  | %17llu | %17llu\n", rb_ins_hist[1], wavl_ins_hist[1]);
+        pr_info("  2 rots  | %17llu | %17llu\n", rb_ins_hist[2], wavl_ins_hist[2]);
+        pr_info(" >=3 rots | %17llu | %17llu\n", rb_ins_hist[3], wavl_ins_hist[3]);
+        pr_info("==================================================\n");
+        pr_info("          [ Delete Operations Cost ]\n");
+        pr_info("==================================================\n");
+        pr_info("Rotations |      RB Tree      |     WAVL Tree\n");
+        pr_info("--------------------------------------------------\n");
+        pr_info("  0 rots  | %17llu | %17llu\n", rb_del_hist[0], wavl_del_hist[0]);
+        pr_info("  1 rots  | %17llu | %17llu\n", rb_del_hist[1], wavl_del_hist[1]);
+        pr_info("  2 rots  | %17llu | %17llu\n", rb_del_hist[2], wavl_del_hist[2]);
+        pr_info(" >=3 rots | %17llu | %17llu\n", rb_del_hist[3], wavl_del_hist[3]);
         pr_info("==================================================\n");
         struct my_node *pos, *n;
         rbtree_postorder_for_each_entry_safe(pos, n, &my_test_tree, node) {
@@ -816,7 +903,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
                 wavl_del_rots / DELETE_OPERATIONS, ((wavl_del_rots * 1000) / DELETE_OPERATIONS) % 1000);
         pr_info("Total Rebalancing Path Len | %9llu | %9llu\n", rb_del_path, wavl_del_path);
         pr_info("==================================================\n");
-        pr_info("       [ Insert Operations Cost Histogram ]\n");
+        pr_info("         [ Insert Operations Cost  ]\n");
         pr_info("==================================================\n");
         pr_info("Rotations |      RB Tree      |     WAVL Tree\n");
         pr_info("--------------------------------------------------\n");
@@ -825,7 +912,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         pr_info("  2 rots  | %17llu | %17llu\n", rb_ins_hist[2], wavl_ins_hist[2]);
         pr_info(" >=3 rots | %17llu | %17llu\n", rb_ins_hist[3], wavl_ins_hist[3]);
         pr_info("==================================================\n");
-        pr_info("       [ Delete Operations Cost Histogram ]\n");
+        pr_info("          [ Delete Operations Cost ]\n");
         pr_info("==================================================\n");
         pr_info("Rotations |      RB Tree      |     WAVL Tree\n");
         pr_info("--------------------------------------------------\n");
