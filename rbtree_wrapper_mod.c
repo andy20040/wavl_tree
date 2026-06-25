@@ -534,7 +534,6 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
     int req_del = 5000;  // default
     int parsed;
     parsed = sscanf(buf, "%15s %d %d", cmd, &req_ins, &req_del);
-
     if (strcmp(buf, "timer_trace") == 0) {
         u64 rb_rots = 0, rb_path = 0;
         u64 wavl_rots = 0, wavl_path = 0;
@@ -768,7 +767,9 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         my_test_tree = RB_ROOT;
         my_wavl_tree = RB_ROOT;
     }
-    else if (strcmp(cmd, "random") == 0 || strcmp(cmd, "seq") == 0){
+    else if (strcmp(cmd, "random") == 0 || strcmp(cmd, "seq") == 0 ||
+             strcmp(cmd, "reverse") == 0 || strcmp(cmd, "seq_rev") == 0 || 
+             strcmp(cmd, "rev_seq") == 0){
         if (parsed < 2) {
             pr_err("[RB-Test] Invalid input. Usage: echo 'seq <inserts> <deletes>' > /proc/rbtree_test_cmd\n");
             return -EINVAL;
@@ -777,7 +778,11 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
             req_del = req_ins;
             pr_info("[RB-Test] Warning: deletes > inserts, modify deletes to %d\n", req_ins);
         }
-        int is_random = (strcmp(buf, "random") == 0);
+        int is_random  = (strcmp(cmd, "random") == 0);
+        int is_seq     = (strcmp(cmd, "seq") == 0);
+        int is_rev     = (strcmp(cmd, "reverse") == 0);
+        int is_seq_rev = (strcmp(cmd, "seq_rev") == 0);
+        int is_rev_seq = (strcmp(cmd, "rev_seq") == 0);
         int TOTAL_OPERATIONS = req_ins;
         int DELETE_OPERATIONS = req_del;
         u32 prng_state = 123456789;
@@ -806,8 +811,16 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         pr_info("[RB-Test] Inserting %d nodes...\n", TOTAL_OPERATIONS);
         
         for (i = 0; i < TOTAL_OPERATIONS; i++) {
-            u64 key = is_random ? (my_xorshift32(&prng_state) % 1000000) : i;
-            
+            u64 key;
+            if (is_random) {
+                key = my_xorshift32(&prng_state) % 1000000;
+            } else if (is_rev || is_rev_seq) {
+                // Reverse Insert: (N-1, N-2 ... 0)
+                key = TOTAL_OPERATIONS - 1 - i;
+            } else {
+                // Seq Insert:  (0, 1, 2 ... N-1)
+                key = i;
+            }
             //  RB Tree Insert 
             old_rots = 0; for_each_possible_cpu(cpu) old_rots += per_cpu(baseline_rotations, cpu);
             rb_nodes[i]  = insert_rb_node(key);
@@ -832,7 +845,26 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
             wavl_ins_rots += per_cpu(wavl_rotations, cpu);
             wavl_ins_path += per_cpu(wavl_path_length, cpu);
         }
-
+        /* ==========================================
+        * Setup Deletion Indices 
+        * ========================================== */
+        for (i = 0; i < TOTAL_OPERATIONS; i++) {
+            if (is_random) {
+                indices[i] = i;
+            } else {
+                int target_key;
+                if (is_seq || is_rev_seq) {
+                    target_key = i; // Seq Delete:  (0, 1, 2...)
+                } else {
+                    target_key = TOTAL_OPERATIONS - 1 - i; // Reverse Delete:  (N-1, N-2...)
+                }
+                if (is_rev || is_rev_seq) {
+                    indices[i] = TOTAL_OPERATIONS - 1 - target_key;
+                } else {
+                    indices[i] = target_key;
+                }
+            }
+        }
         /* ==========================================
         * shuffle
         * ========================================== */
@@ -893,7 +925,11 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         else{
             pr_info("               [ Seqential Insert delete ]\n");
         }
-
+        if (is_random) pr_info("               [ Random Insert / Random Delete ]\n");
+        else if (is_seq) pr_info("               [ Seq Insert / Seq Delete ]\n");
+        else if (is_rev) pr_info("               [ Reverse Insert / Reverse Delete ]\n");
+        else if (is_seq_rev) pr_info("               [ Seq Insert / Reverse Delete ]\n");
+        else if (is_rev_seq) pr_info("               [ Reverse Insert / Seq Delete ]\n");
         pr_info("==================================================\n");
         pr_info("               [ Insert Phase ]\n");
         pr_info("==================================================\n");
