@@ -529,9 +529,11 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
     u64 rb_ins_hist[4] = {0}, wavl_ins_hist[4] = {0};
     u64 rb_del_hist[4] = {0}, wavl_del_hist[4] = {0};
     u64 old_rots, new_rots, diff;
+    int req_ins = 10000; // default
+    int req_del = 5000;  // default
+    int parsed;
+    parsed = sscanf(buf, "%15s %d %d", cmd, &req_ins, &req_del);
 
-    const int TOTAL_OPERATIONS = 10000;
-    const int DELETE_OPERATIONS = 5000;
     if (strcmp(buf, "timer_trace") == 0) {
         u64 rb_rots = 0, rb_path = 0;
         u64 wavl_rots = 0, wavl_path = 0;
@@ -540,7 +542,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         u64 total_deletes = 0;
         int i;
         int WARMUP_COUNT = TRACE_SIZE / 5;
-        pr_info("[RB-Test] Replaying Real Kernel Trace (%d ops)...\n", TRACE_SIZE);
+        pr_info("[RB-Test] Replaying Timer Trace (%d ops)...\n", TRACE_SIZE);
 
         for (i = 0; i < TRACE_SIZE; i++) {
             unsigned long long key = real_trace[i].key;
@@ -609,7 +611,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         }
 
         pr_info("==================================================\n");
-        pr_info("          [ Real Kernel Trace Replay ]\n");
+        pr_info("          [ Timer Trace Replay ]\n");
         pr_info("==================================================\n");
         pr_info("Metric                     |  RB Tree  | WAVL Tree\n");
         pr_info("--------------------------------------------------\n");
@@ -766,7 +768,17 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         my_wavl_tree = RB_ROOT;
     }
     else if (strcmp(buf, "random") == 0 || strcmp(buf, "seq") == 0){
+        if (parsed < 2) {
+            pr_err("[RB-Test] Invalid input. Usage: echo 'seq <inserts> <deletes>' > /proc/rbtree_test_cmd\n");
+            return -EINVAL;
+        }
+        if (req_del > req_ins) {
+            req_del = req_ins;
+            pr_info("[RB-Test] Warning: deletes > inserts, modify deletes to %d\n", req_ins);
+        }
         int is_random = (strcmp(buf, "random") == 0);
+        int TOTAL_OPERATIONS = req_ins;
+        int DELETE_OPERATIONS = req_del;
         u32 prng_state = 123456789;
         struct my_node **rb_nodes = vmalloc(TOTAL_OPERATIONS * sizeof(struct my_node *));
         struct my_node **wavl_nodes = vmalloc(TOTAL_OPERATIONS * sizeof(struct my_node *));
