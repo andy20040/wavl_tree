@@ -508,6 +508,7 @@ static u32 my_xorshift32(u32 *state) {
 static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user, size_t count, loff_t *ppos)
 {
     char buf[32]; 
+    char cmd[16] = {0};
     size_t copy_len;
     int cpu, i; 
     copy_len = (count < sizeof(buf)) ? count : (sizeof(buf) - 1);
