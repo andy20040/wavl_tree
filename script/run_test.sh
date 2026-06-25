@@ -27,16 +27,24 @@ for MODE in "${MODES[@]}"; do
 
         sleep 3
         
-        RB_TOT_ROT=$(dmesg | grep "Total Rotation Counts" | tail -n 1 | awk -F'|' '{print $2}' | tr -d ' ')
-        WAVL_TOT_ROT=$(dmesg | grep "Total Rotation Counts" | tail -n 1 | awk -F'|' '{print $3}' | tr -d ' ')
-        RB_TOT_PATH=$(dmesg | grep "Total Rebalancing Path Len" | tail -n 1 | awk -F'|' '{print $2}' | tr -d ' ')
-        WAVL_TOT_PATH=$(dmesg | grep "Total Rebalancing Path Len" | tail -n 1 | awk -F'|' '{print $3}' | tr -d ' ')
+        ROT_LINES=$(dmesg | grep "Total Rotation Counts")
+        PATH_LINES=$(dmesg | grep "Total Rebalancing Path Len")
         
-        if [ -z "$RB_TOT_PATH" ] || [ -z "$WAVL_TOT_PATH" ]; then
-            echo "  [error] $MODE D=$D data not found , skipped"
-            continue
-        fi
-        echo "$MODE,$N,$D,$RB_TOT_ROT,$WAVL_TOT_ROT,$RB_TOT_PATH,$WAVL_TOT_PATH" >> results_all.csv
+        # Insert Phase ---
+        RB_INS_ROT=$(echo "$ROT_LINES" | head -n 1 | awk -F'|' '{print $2}' | tr -d ' ')
+        WAVL_INS_ROT=$(echo "$ROT_LINES" | head -n 1 | awk -F'|' '{print $3}' | tr -d ' ')
+        RB_INS_PATH=$(echo "$PATH_LINES" | head -n 1 | awk -F'|' '{print $2}' | tr -d ' ')
+        WAVL_INS_PATH=$(echo "$PATH_LINES" | head -n 1 | awk -F'|' '{print $3}' | tr -d ' ')
+        
+        #Delete Phase ---
+        RB_DEL_ROT=$(echo "$ROT_LINES" | tail -n 1 | awk -F'|' '{print $2}' | tr -d ' ')
+        WAVL_DEL_ROT=$(echo "$ROT_LINES" | tail -n 1 | awk -F'|' '{print $3}' | tr -d ' ')
+        RB_DEL_PATH=$(echo "$PATH_LINES" | tail -n 1 | awk -F'|' '{print $2}' | tr -d ' ')
+        WAVL_DEL_PATH=$(echo "$PATH_LINES" | tail -n 1 | awk -F'|' '{print $3}' | tr -d ' ')
+
+        # 寫入 CSV (新增 Phase 欄位)
+        echo "$MODE,$N,$D,Insert,$RB_INS_ROT,$WAVL_INS_ROT,$RB_INS_PATH,$WAVL_INS_PATH" >> results_all.csv
+        echo "$MODE,$N,$D,Delete,$RB_DEL_ROT,$WAVL_DEL_ROT,$RB_DEL_PATH,$WAVL_DEL_PATH" >> results_all.csv
     done
 done
 
