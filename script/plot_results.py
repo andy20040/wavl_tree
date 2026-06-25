@@ -14,7 +14,7 @@ target_modes = ['seq', 'reverse', 'seq_rev', 'rev_seq']
 
 plt.style.use('seaborn-v0_8-whitegrid')
 
-print("開始繪製圖表...")
+print("starting plot diagram...")
 
 
 for mode in target_modes:
