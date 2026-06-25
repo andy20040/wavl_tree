@@ -768,7 +768,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         my_test_tree = RB_ROOT;
         my_wavl_tree = RB_ROOT;
     }
-    else if (strcmp(buf, "random") == 0 || strcmp(buf, "seq") == 0){
+    else if (strcmp(cmd, "random") == 0 || strcmp(cmd, "seq") == 0){
         if (parsed < 2) {
             pr_err("[RB-Test] Invalid input. Usage: echo 'seq <inserts> <deletes>' > /proc/rbtree_test_cmd\n");
             return -EINVAL;
