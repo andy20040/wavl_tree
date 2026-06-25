@@ -5,13 +5,13 @@ BEGIN {
 }
 
 kprobe:__enqueue_entity {
-    // arg1 是 struct sched_entity *se
+    // arg1 : struct sched_entity *se
     $se = (struct sched_entity *)arg1;
     printf("I %llu\n", $se->vruntime);
 }
 
 kprobe:__dequeue_entity {
-    // arg1 是 struct sched_entity *se
+    // arg1 : struct sched_entity *se
     $se = (struct sched_entity *)arg1;
     printf("D %llu\n", $se->vruntime);
 }

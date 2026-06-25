@@ -41,8 +41,6 @@ for MODE in "${MODES[@]}"; do
         WAVL_DEL_ROT=$(echo "$ROT_LINES" | tail -n 1 | awk -F'|' '{print $3}' | tr -d ' ')
         RB_DEL_PATH=$(echo "$PATH_LINES" | tail -n 1 | awk -F'|' '{print $2}' | tr -d ' ')
         WAVL_DEL_PATH=$(echo "$PATH_LINES" | tail -n 1 | awk -F'|' '{print $3}' | tr -d ' ')
-
-        # 寫入 CSV (新增 Phase 欄位)
         echo "$MODE,$N,$D,Insert,$RB_INS_ROT,$WAVL_INS_ROT,$RB_INS_PATH,$WAVL_INS_PATH" >> results_all.csv
         echo "$MODE,$N,$D,Delete,$RB_DEL_ROT,$WAVL_DEL_ROT,$RB_DEL_PATH,$WAVL_DEL_PATH" >> results_all.csv
     done

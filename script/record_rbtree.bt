@@ -4,10 +4,7 @@ BEGIN {
 
 /* timer start (Insert) */
 tracepoint:timer:hrtimer_start {
-    // 將計時器的指標當作 Key，記錄它的 expires 值
     @expires[args->hrtimer] = args->expires;
-    
-    // 印出 Insert 動作與 expires
     printf("I %lld\n", args->expires);
 }
 

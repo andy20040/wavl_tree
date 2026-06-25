@@ -1,15 +1,16 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker  # 新增這行：用來處理數字格式化
-
-
+import matplotlib.ticker as ticker 
+import os
+output_dir = "../graph"
 try:
     df = pd.read_csv('results_all.csv')
 except FileNotFoundError:
     print(" results_all.csv not found ")
     exit()
 
-
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
 target_modes = ['seq', 'reverse', 'seq_rev', 'rev_seq']
 phases = ['Insert', 'Delete']
 
@@ -70,13 +71,13 @@ for mode in target_modes:
         ax2.legend(fontsize=11)
         ax2.xaxis.set_major_formatter(comma_fmt)
         ax2.yaxis.set_major_formatter(comma_fmt)
-        ax2.tick_params(axis='x', rotation=30, labelsize=10) # X軸傾斜 30 度
+        ax2.tick_params(axis='x', rotation=30, labelsize=10) 
         ax2.tick_params(axis='y', labelsize=10)
 
-        filename = f'{mode}_{phase.lower()}_comparison.png'
+        filename = os.path.join(output_dir, f'{mode}_{phase.lower()}_comparison.png')
 
         plt.tight_layout(pad=2.0) 
-        plt.savefig(filename, dpi=300, bbox_inches='tight') # bbox_inches='tight' 保證邊緣不被切除
+        plt.savefig(filename, dpi=300, bbox_inches='tight') 
         print(f" saved: {filename}")
         
         plt.close()
