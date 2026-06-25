@@ -16,7 +16,7 @@ echo ""
 echo "=================================================="
 echo " insert "
 echo "=================================================="
-D_FIXED=0
+D_FIXED=1
 
 for MODE in "${MODES[@]}"; do
     echo " testing : $MODE (Insert Scaling)..."

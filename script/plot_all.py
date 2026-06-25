@@ -37,10 +37,15 @@ for mode in target_modes:
 
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
 
+        if phase == 'Insert':
+            x_data = subset['N']
+        else:
+            x_data = subset['D']
+
         #  (Path Length) ---
-        ax1.plot(subset['D'], subset['RB_Tot_Path'], 
+        ax1.plot(x_data, subset['RB_Tot_Path'], 
                  marker='o', markersize=5, color='red', linewidth=2, label='RB Tree')
-        ax1.plot(subset['D'], subset['WAVL_Tot_Path'], 
+        ax1.plot(x_data, subset['WAVL_Tot_Path'], 
                  marker='s', markersize=5, color='blue', linewidth=2, linestyle='--', label='WAVL Tree')
         
         ax1.set_title(f'[{mode.upper()} - {phase}] Total Path Length', fontsize=14, pad=15)
@@ -57,9 +62,9 @@ for mode in target_modes:
         ax1.tick_params(axis='y', labelsize=10)
 
         # (Total Rotations) ---
-        ax2.plot(subset['D'], subset['RB_Tot_Rot'], 
+        ax2.plot(x_data, subset['RB_Tot_Rot'], 
                  marker='o', markersize=6, color='red', linewidth=2, label='RB Tree')
-        ax2.plot(subset['D'], subset['WAVL_Tot_Rot'], 
+        ax2.plot(x_data, subset['WAVL_Tot_Rot'], 
                  marker='x', markersize=5, color='blue', linewidth=2, linestyle='--', alpha=0.8, label='WAVL Tree')
         
         ax2.set_title(f'[{mode.upper()} - {phase}] Total Rotations', fontsize=14, pad=15)
