@@ -7,7 +7,7 @@ N=1000000
 MODES=("seq" "reverse" "seq_rev" "rev_seq")
 
 
-echo "Mode,N,D,RB_Tot_Rot,WAVL_Tot_Rot,RB_Tot_Path,WAVL_Tot_Path" > results_all.csv
+echo "Mode,N,D,Phase,RB_Tot_Rot,WAVL_Tot_Rot,RB_Tot_Path,WAVL_Tot_Path" > results_all.csv
 
 echo "start testing..."
 
