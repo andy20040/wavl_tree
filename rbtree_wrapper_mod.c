@@ -926,12 +926,6 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
             wavl_del_rots += per_cpu(wavl_rotations, cpu);
             wavl_del_path += per_cpu(wavl_path_length, cpu);
         }
-        if(is_random){
-            pr_info("               [ Random Insert delete ]\n");
-        }
-        else{
-            pr_info("               [ Seqential Insert delete ]\n");
-        }
         if (is_random || full_rand ) pr_info("               [ Random Insert / Random Delete ]\n");
         else if (is_seq) pr_info("               [ Seq Insert / Seq Delete ]\n");
         else if (is_rev) pr_info("               [ Reverse Insert / Reverse Delete ]\n");

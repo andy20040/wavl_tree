@@ -4,48 +4,48 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import os
 
-output_dir = "graph"
+output_dir = "../graph"
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
-
 try:
-    df = pd.read_csv('results_random_dist.csv')
+    df = pd.read_csv('results_ratio.csv')
 except FileNotFoundError:
-    print(" results_random_dist.csv not found")
+    print("results_ratio.csv not found")
     exit()
+
+
+df_delete = df[df['Phase'] == 'Delete']
 
 plt.style.use('seaborn-v0_8-whitegrid')
 comma_fmt = ticker.StrMethodFormatter('{x:,.0f}')
 
-# 繪製兩種階段：Insert 和 Delete
-for phase in ['Insert', 'Delete']:
-    phase_data = df[df['Phase'] == phase]
-    
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
 
-    # (Path) 
-    path_data = phase_data[phase_data['Metric'] == 'Path']
-    sns.boxplot(x='Tree', y='Value', data=path_data, ax=ax1, width=0.5, 
-                palette={'RB Tree': '#ff9999', 'WAVL Tree': '#99ccff'})
-    ax1.set_title(f'[{phase}] Distribution of Path Length', fontsize=14, pad=10)
-    ax1.set_ylabel('Total Rebalancing Path Length')
-    ax1.set_xlabel('')
-    ax1.yaxis.set_major_formatter(comma_fmt)
+# (Path Length)
+path_data = df_delete[df_delete['Metric'] == 'Path']
+sns.boxplot(x='Ratio', y='Value', hue='Tree', data=path_data, ax=ax1, 
+            width=0.6, palette={'RB Tree': '#ff9999', 'WAVL Tree': '#99ccff'})
 
-    # (Rotations) 
-    rot_data = phase_data[phase_data['Metric'] == 'Rotations']
-    sns.boxplot(x='Tree', y='Value', data=rot_data, ax=ax2, width=0.5, 
-                palette={'RB Tree': '#ff9999', 'WAVL Tree': '#99ccff'})
-    ax2.set_title(f'[{phase}] Distribution of Rotations', fontsize=14, pad=10)
-    ax2.set_ylabel('Total Rotations')
-    ax2.set_xlabel('')
-    ax2.yaxis.set_major_formatter(comma_fmt)
+ax1.set_title('[Delete Phase] Rebalancing Path vs Deletion Ratio', fontsize=14, pad=15)
+ax1.set_xlabel('Deletion Ratio (%)', fontsize=12)
+ax1.set_ylabel('Total Rebalancing Path Length', fontsize=12)
+ax1.yaxis.set_major_formatter(comma_fmt)
+ax1.legend(title='Data Structure')
 
-    # 
-    filename = os.path.join(output_dir, f'random_distribution_{phase.lower()}.png')
-    plt.tight_layout()
-    plt.savefig(filename, dpi=300)
-    print(f"complete: {filename}")
+#  (Rotations)
+rot_data = df_delete[df_delete['Metric'] == 'Rotations']
+sns.boxplot(x='Ratio', y='Value', hue='Tree', data=rot_data, ax=ax2, 
+            width=0.6, palette={'RB Tree': '#ff9999', 'WAVL Tree': '#99ccff'})
 
-plt.close()
+ax2.set_title('[Delete Phase] Rotations vs Deletion Ratio', fontsize=14, pad=15)
+ax2.set_xlabel('Deletion Ratio (%)', fontsize=12)
+ax2.set_ylabel('Total Rotations', fontsize=12)
+ax2.yaxis.set_major_formatter(comma_fmt)
+ax2.legend(title='Data Structure')
+
+# 存檔
+filename = os.path.join(output_dir, 'deletion_ratio_analysis.png')
+plt.tight_layout(pad=2.0)
+plt.savefig(filename, dpi=300)
+print(f"done: {filename}")
