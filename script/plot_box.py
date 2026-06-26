@@ -9,7 +9,7 @@ if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
 try:
-    df = pd.read_csv('results_ratio.csv')
+    df = pd.read_csv('../trace_data/results_random.csv')
 except FileNotFoundError:
     print("results_ratio.csv not found")
     exit()
