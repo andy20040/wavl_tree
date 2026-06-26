@@ -767,7 +767,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         my_test_tree = RB_ROOT;
         my_wavl_tree = RB_ROOT;
     }
-    else if (strcmp(cmd, "random") == 0 || strcmp(cmd, "seq") == 0 ||
+    else if (strcmp(cmd, "random") == 0 ||strcmp(cmd, "randomseed") == 0 || strcmp(cmd, "seq") == 0 ||
              strcmp(cmd, "reverse") == 0 || strcmp(cmd, "seq_rev") == 0 || 
              strcmp(cmd, "rev_seq") == 0){
         if (parsed < 2) {
@@ -778,7 +778,8 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
             req_del = req_ins;
             pr_info("[RB-Test] Warning: deletes > inserts, modify deletes to %d\n", req_ins);
         }
-        int is_random  = (strcmp(cmd, "random") == 0);
+        int is_random  = (strcmp(cmd, "randomseed") == 0);
+        int full_rand  = (strcmp(cmd, "random") == 0);
         int is_seq     = (strcmp(cmd, "seq") == 0);
         int is_rev     = (strcmp(cmd, "reverse") == 0);
         int is_seq_rev = (strcmp(cmd, "seq_rev") == 0);
@@ -812,9 +813,15 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         
         for (i = 0; i < TOTAL_OPERATIONS; i++) {
             u64 key;
+            unsigned int rand_val;
             if (is_random) {
                 key = my_xorshift32(&prng_state) % 1000000;
-            } else if (is_rev || is_rev_seq) {
+            } 
+            else if(full_rand){
+                get_random_bytes(&rand_val, sizeof(rand_val));
+                key = rand_val % 1000000;
+            }
+            else if (is_rev || is_rev_seq) {
                 // Reverse Insert: (N-1, N-2 ... 0)
                 key = TOTAL_OPERATIONS - 1 - i;
             } else {
