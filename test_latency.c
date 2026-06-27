@@ -172,7 +172,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
      *  (Random / Seq / Reverse)
      * ========================================================== */
     else if (strcmp(cmd, "random") == 0 || strcmp(cmd, "randomseed") == 0 || strcmp(cmd, "seq") == 0 ||
-             strcmp(cmd, "reverse") == 0 || strcmp(cmd, "seq_rev") == 0 || strcmp(cmd, "rev_seq") == 0) {
+             strcmp(cmd, "reverse") == 0 || strcmp(cmd, "seq_rev") == 0 || strcmp(cmd, "rev_seq") == 0||strcmp(cmd, "lookup") == 0) {
         
         int is_random  = (strcmp(cmd, "randomseed") == 0);
         int full_rand  = (strcmp(cmd, "random") == 0);
@@ -180,7 +180,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         int is_rev     = (strcmp(cmd, "reverse") == 0);
         int is_seq_rev = (strcmp(cmd, "seq_rev") == 0);
         int is_rev_seq = (strcmp(cmd, "rev_seq") == 0);
-        
+        int look_up    =  (strcmp(cmd, "lookup")==0) ;
         int TOTAL_OPERATIONS = req_ins;
         int DELETE_OPERATIONS = (req_del > req_ins) ? req_ins : req_del;
         u32 prng_state = 123456789;
@@ -256,7 +256,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         * Setup Deletion Indices 
         * ========================================== */
         for (i = 0; i < TOTAL_OPERATIONS; i++) {
-            if (is_random || full_rand) {  // 🌟 這裡加上 full_rand
+            if (is_random || full_rand||look_up) {  
                 indices[i] = i;
             } else {
                 int target_key;
@@ -276,7 +276,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         * shuffle
         * ========================================== */
 
-        if (is_random || full_rand) {  // 🌟 這裡也加上 full_rand
+        if (is_random || full_rand ||look_up) { 
             for (i = TOTAL_OPERATIONS - 1; i > 0; i--) {
                 u32 j = my_xorshift32(&prng_state) % (i + 1);
                 int temp = indices[i];
@@ -284,65 +284,89 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
                 indices[j] = temp;
             }
         }
-        /* 4. Delete Phase ( Lookup and Erase) */
-        for (i = 0; i < DELETE_OPERATIONS; i++) {
-            int target_idx = indices[i]; 
-            u64 target_key = rb_nodes[target_idx]->key; // 假設兩棵樹的 key 一致
-            struct my_node *rb_target, *wavl_target;
+        if (look_up) {
+            for (i = 0; i < DELETE_OPERATIONS; i++) {
+                int target_idx = indices[i]; 
+                u64 target_key = rb_nodes[target_idx]->key; 
 
-            /*  Lookup */
-            t_start = ktime_get_ns(); rb_target = do_search(target_key, &my_test_tree); t_end = ktime_get_ns();
-            rb_lookup_time += (t_end - t_start);
-
-            t_start = ktime_get_ns(); wavl_target = do_search(target_key, &my_wavl_tree); t_end = ktime_get_ns();
-            wavl_lookup_time += (t_end - t_start);
-
-            /*  Erase  */
-            if (rb_target) {
-                t_start = ktime_get_ns();
-                rb_erase(&rb_target->node, &my_test_tree);
+                t_start = ktime_get_ns(); 
+                do_search(target_key, &my_test_tree); 
                 t_end = ktime_get_ns();
-                rb_del_time += (t_end - t_start);
+                rb_lookup_time += (t_end - t_start);
+
+                t_start = ktime_get_ns(); 
+                do_search(target_key, &my_wavl_tree); 
+                t_end = ktime_get_ns();
+                wavl_lookup_time += (t_end - t_start);
+            }
+
+            pr_info("==================================================\n");
+            pr_info("     [ Pure Lookup Benchmark (Read-Only) ]\n");
+            pr_info("==================================================\n");
+            pr_info("Tree Size (Nodes) : %d\n", TOTAL_OPERATIONS);
+            pr_info("Total Lookups     : %d\n", DELETE_OPERATIONS);
+            pr_info("--------------------------------------------------\n");
+            pr_info("Metric (Avg)      |    Native RB   |    WAVL Tree\n");
+            pr_info("--------------------------------------------------\n");
+            pr_info("Avg Lookup Latency| %9llu ns | %9llu ns\n", 
+                DELETE_OPERATIONS > 0 ? rb_lookup_time / DELETE_OPERATIONS : 0, 
+                DELETE_OPERATIONS > 0 ? wavl_lookup_time / DELETE_OPERATIONS : 0);
+            pr_info("==================================================\n");
+
+        } 
+        else {
+            for (i = 0; i < DELETE_OPERATIONS; i++) {
+                int target_idx = indices[i]; 
                 
-                kfree(rb_target); 
-                rb_nodes[target_idx] = NULL;
-            }
-            if (wavl_target) {
-                t_start = ktime_get_ns();
-                wavl_erase(&wavl_target->node, &my_wavl_tree);
-                t_end = ktime_get_ns();
-                wavl_del_time += (t_end - t_start);
+                if (rb_nodes[target_idx]) {
+                    t_start = ktime_get_ns();
+                    rb_erase(&rb_nodes[target_idx]->node, &my_test_tree);
+                    t_end = ktime_get_ns();
+                    rb_del_time += (t_end - t_start);
+                    
+                    kfree(rb_nodes[target_idx]); 
+                    rb_nodes[target_idx] = NULL; 
+                }
+                if (wavl_nodes[target_idx]) {
+                    t_start = ktime_get_ns();
+                    wavl_erase(&wavl_nodes[target_idx]->node, &my_wavl_tree);
+                    t_end = ktime_get_ns();
+                    wavl_del_time += (t_end - t_start);
 
-                kfree(wavl_target);
-                wavl_nodes[target_idx] = NULL;
+                    kfree(wavl_nodes[target_idx]);
+                    wavl_nodes[target_idx] = NULL;
+                }
             }
+
+            pr_info("==================================================\n");
+            pr_info("     [      Latency Benchmark (ns) ]\n");
+            pr_info("==================================================\n");
+            pr_info("Workload Type     : %s\n", cmd);
+            pr_info("Total Inserts     : %d\n", TOTAL_OPERATIONS);
+            pr_info("Total Deletes     : %d\n", DELETE_OPERATIONS);
+            pr_info("==================================================\n");
+            pr_info("Metric (Avg/Total)|    Native RB   |    WAVL Tree\n");
+            pr_info("--------------------------------------------------\n");
+            pr_info("Avg Insert Latency| %9llu ns | %9llu ns\n", TOTAL_OPERATIONS > 0 ? rb_ins_time / TOTAL_OPERATIONS : 0, TOTAL_OPERATIONS > 0 ? wavl_ins_time / TOTAL_OPERATIONS : 0);
+            pr_info("Avg Erase Latency | %9llu ns | %9llu ns\n", DELETE_OPERATIONS > 0 ? rb_del_time / DELETE_OPERATIONS : 0, DELETE_OPERATIONS > 0 ? wavl_del_time / DELETE_OPERATIONS : 0);
+            pr_info("Total Traversal   | %9llu ns | %9llu ns\n", rb_trav_time, wavl_trav_time);
+            pr_info("==================================================\n");
         }
 
-        pr_info("==================================================\n");
-        pr_info("     [ Bulk Latency Benchmark (ns) ]\n");
-        pr_info("==================================================\n");
-        pr_info("Workload Type     : %s\n", cmd);
-        pr_info("Total Inserts     : %d\n", TOTAL_OPERATIONS);
-        pr_info("Total Deletes     : %d\n", DELETE_OPERATIONS);
-        pr_info("==================================================\n");
-        pr_info("Metric (Avg/Total)|    Native RB   |    WAVL Tree\n");
-        pr_info("--------------------------------------------------\n");
-        pr_info("Avg Insert Latency| %9llu ns | %9llu ns\n", TOTAL_OPERATIONS > 0 ? rb_ins_time / TOTAL_OPERATIONS : 0, TOTAL_OPERATIONS > 0 ? wavl_ins_time / TOTAL_OPERATIONS : 0);
-        pr_info("Avg Lookup Latency| %9llu ns | %9llu ns\n", DELETE_OPERATIONS > 0 ? rb_lookup_time / DELETE_OPERATIONS : 0, DELETE_OPERATIONS > 0 ? wavl_lookup_time / DELETE_OPERATIONS : 0);
-        pr_info("Avg Erase Latency | %9llu ns | %9llu ns\n", DELETE_OPERATIONS > 0 ? rb_del_time / DELETE_OPERATIONS : 0, DELETE_OPERATIONS > 0 ? wavl_del_time / DELETE_OPERATIONS : 0);
-        pr_info("Total Traversal   | %9llu ns | %9llu ns\n", rb_trav_time, wavl_trav_time);
-        pr_info("==================================================\n");
-
-        /* clear */
-        for (i = 0; i < TOTAL_OPERATIONS; i++) {
-            if (rb_nodes[i]) kfree(rb_nodes[i]);
-            if (wavl_nodes[i]) kfree(wavl_nodes[i]);
-        }
+        /* ==========================================================
+         *  Cleanup
+         * ========================================================== */
         vfree(rb_nodes);
         vfree(wavl_nodes);
         vfree(indices);
-        my_test_tree = RB_ROOT;
-        my_wavl_tree = RB_ROOT;
+
+        struct my_node *pos, *n;
+        rbtree_postorder_for_each_entry_safe(pos, n, &my_test_tree, node) {
+            kfree(pos);
+        }
+        rbtree_postorder_for_each_entry_safe(pos, n, &my_wavl_tree, node) {
+            kfree(pos);
+        }
     }
     else {
         pr_err("[Latency-Test] Unknown command.\n");
