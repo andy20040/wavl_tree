@@ -339,7 +339,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
             }
 
             pr_info("==================================================\n");
-            pr_info("     [      Latency Benchmark (ns) ]\n");
+            pr_info("     [ Bulk Latency Benchmark (ns) ]\n");
             pr_info("==================================================\n");
             pr_info("Workload Type     : %s\n", cmd);
             pr_info("Total Inserts     : %d\n", TOTAL_OPERATIONS);
@@ -354,7 +354,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         }
 
         /* ==========================================================
-         *  Cleanup
+         *  (Cleanup)
          * ========================================================== */
         vfree(rb_nodes);
         vfree(wavl_nodes);
@@ -367,6 +367,8 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         rbtree_postorder_for_each_entry_safe(pos, n, &my_wavl_tree, node) {
             kfree(pos);
         }
+        my_test_tree = RB_ROOT;
+        my_wavl_tree = RB_ROOT;
     }
     else {
         pr_err("[Latency-Test] Unknown command.\n");
