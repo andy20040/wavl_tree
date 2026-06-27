@@ -856,7 +856,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         * Setup Deletion Indices 
         * ========================================== */
         for (i = 0; i < TOTAL_OPERATIONS; i++) {
-            if (is_random) {
+            if (is_random|| full_rand) {
                 indices[i] = i;
             } else {
                 int target_key;
@@ -876,7 +876,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         * shuffle
         * ========================================== */
 
-        if (is_random) {
+        if (is_random|| full_rand) {
             for (i = TOTAL_OPERATIONS - 1; i > 0; i--) {
                 u32 j = my_xorshift32(&prng_state) % (i + 1);
                 int temp = indices[i];

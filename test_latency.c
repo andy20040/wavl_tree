@@ -194,13 +194,13 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         
         struct my_node **rb_nodes = vmalloc(TOTAL_OPERATIONS * sizeof(struct my_node *));
         struct my_node **wavl_nodes = vmalloc(TOTAL_OPERATIONS * sizeof(struct my_node *));
-        int *indices = kmalloc_array(TOTAL_OPERATIONS , sizeof(int), GFP_KERNEL);
+        int *indices = vmalloc(TOTAL_OPERATIONS * sizeof(int));
 
         if (!rb_nodes || !wavl_nodes || !indices) {
             pr_err("Memory allocation failed!\n");
             if (rb_nodes) vfree(rb_nodes);
             if (wavl_nodes) vfree(wavl_nodes);
-            if (indices) kfree(indices); 
+            if (indices) vfree(indices);
             return -ENOMEM; 
         }
 
@@ -252,14 +252,31 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
             t_end = ktime_get_ns(); wavl_trav_time = (t_end - t_start);
         }
 
-        /* 3. Setup Deletion Indices & Shuffle */
+        /* ==========================================
+        * Setup Deletion Indices 
+        * ========================================== */
         for (i = 0; i < TOTAL_OPERATIONS; i++) {
-            if (!is_random && !full_rand) {
-                int target_key = (is_seq || is_rev_seq) ? i : TOTAL_OPERATIONS - 1 - i;
-                indices[i] = (is_rev || is_rev_seq) ? TOTAL_OPERATIONS - 1 - target_key : target_key;
+            if (is_random || full_rand) {  // 🌟 這裡加上 full_rand
+                indices[i] = i;
+            } else {
+                int target_key;
+                if (is_seq || is_rev_seq) {
+                    target_key = i; 
+                } else {
+                    target_key = TOTAL_OPERATIONS - 1 - i; 
+                }
+                if (is_rev || is_rev_seq) {
+                    indices[i] = TOTAL_OPERATIONS - 1 - target_key;
+                } else {
+                    indices[i] = target_key;
+                }
             }
         }
-        if (is_random || full_rand) {
+        /* ==========================================
+        * shuffle
+        * ========================================== */
+
+        if (is_random || full_rand) {  // 🌟 這裡也加上 full_rand
             for (i = TOTAL_OPERATIONS - 1; i > 0; i--) {
                 u32 j = my_xorshift32(&prng_state) % (i + 1);
                 int temp = indices[i];
@@ -267,7 +284,6 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
                 indices[j] = temp;
             }
         }
-
         /* 4. Delete Phase ( Lookup and Erase) */
         for (i = 0; i < DELETE_OPERATIONS; i++) {
             int target_idx = indices[i]; 
@@ -324,7 +340,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         }
         vfree(rb_nodes);
         vfree(wavl_nodes);
-        kfree(indices);
+        vfree(indices);
         my_test_tree = RB_ROOT;
         my_wavl_tree = RB_ROOT;
     }
