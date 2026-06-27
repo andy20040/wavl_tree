@@ -7,7 +7,7 @@ import os
 output_dir = "../graph"
 
 try:
-    df = pd.read_csv('../results_all.csv')
+    df = pd.read_csv('../results_all.csv') 
 except FileNotFoundError:
     try:
         df = pd.read_csv('results_all.csv') 

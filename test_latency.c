@@ -298,7 +298,6 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
                 indices[j] = temp;
             }
         }
-            /* 🚀 模式 B：混合測試 (在逐漸刪除的破碎樹狀結構中，測量搜尋與刪除效能) */
         for (i = 0; i < DELETE_OPERATIONS; i++) {
                 int target_idx = indices[i]; 
                 u64 target_key = rb_nodes[target_idx]->key; 

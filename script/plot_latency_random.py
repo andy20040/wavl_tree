@@ -1,0 +1,49 @@
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+import os
+
+output_dir = "../graph"
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+
+try:
+    df = pd.read_csv('../trace_data/latency_results_random.csv')
+except FileNotFoundError:
+    print("Error: latency_results_random.csv not found")
+    exit()
+
+plt.style.use('seaborn-v0_8-whitegrid')
+comma_fmt = ticker.StrMethodFormatter('{x:,.0f}')
+
+
+phases = ['Insert', 'Lookup', 'Delete']
+my_palette = {'RB Tree': '#e63946', 'WAVL Tree': '#1d3557'}
+
+
+fig, axes = plt.subplots(1, 3, figsize=(22, 6))
+
+for i, phase in enumerate(phases):
+    phase_data = df[df['Phase'] == phase]
+    if phase_data.empty:
+        continue
+    
+    ax = axes[i]
+    sns.lineplot(x='Ratio', y='Value_ns', hue='Tree', data=phase_data, ax=ax,
+                 errorbar='sd', marker='o', markersize=8, linewidth=2.5, palette=my_palette)
+
+    ax.set_title(f'[{phase} Phase] Latency vs Deletion Ratio', fontsize=14, pad=15)
+    ax.set_xlabel('Deletion Ratio (%)', fontsize=12)
+    ax.set_ylabel('Latency (ns)', fontsize=12)
+    ax.yaxis.set_major_formatter(comma_fmt)
+    ax.set_xticks(range(10, 101, 10)) 
+    ax.legend(title='Data Structure', fontsize=11)
+    
+    bottom, top = ax.get_ylim()
+    ax.set_ylim(bottom=0, top=top * 1.1)
+
+filename = os.path.join(output_dir, 'latency_random_comparison.png')
+plt.tight_layout(pad=2.0)
+plt.savefig(filename, dpi=300)
+print(f"Done: {filename}")

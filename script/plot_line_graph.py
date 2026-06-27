@@ -20,7 +20,7 @@ except FileNotFoundError:
 plt.style.use('seaborn-v0_8-whitegrid')
 comma_fmt = ticker.StrMethodFormatter('{x:,.0f}')
 
-phases = ['Insert', 'Delete']
+phases = ['Delete']
 
 my_palette = {'RB Tree': '#e63946', 'WAVL Tree': '#1d3557'}
 
