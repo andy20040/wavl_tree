@@ -105,7 +105,6 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
             if (is_insert) {
                 struct my_node *rb_new = kmalloc(sizeof(struct my_node), GFP_KERNEL);
                 struct my_node *wavl_new = kmalloc(sizeof(struct my_node), GFP_KERNEL);
-                if (!rb_new || !wavl_new) continue;
                 rb_new->key = key; wavl_new->key = key;
 
                 t_start = ktime_get_ns(); do_rb_insert(rb_new, &my_test_tree); t_end = ktime_get_ns();
@@ -172,7 +171,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
      *  (Random / Seq / Reverse)
      * ========================================================== */
     else if (strcmp(cmd, "random") == 0 || strcmp(cmd, "randomseed") == 0 || strcmp(cmd, "seq") == 0 ||
-             strcmp(cmd, "reverse") == 0 || strcmp(cmd, "seq_rev") == 0 || strcmp(cmd, "rev_seq") == 0||strcmp(cmd, "lookup") == 0) {
+             strcmp(cmd, "reverse") == 0 || strcmp(cmd, "seq_rev") == 0 || strcmp(cmd, "rev_seq") == 0) {
         
         int is_random  = (strcmp(cmd, "randomseed") == 0);
         int full_rand  = (strcmp(cmd, "random") == 0);
@@ -180,7 +179,6 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         int is_rev     = (strcmp(cmd, "reverse") == 0);
         int is_seq_rev = (strcmp(cmd, "seq_rev") == 0);
         int is_rev_seq = (strcmp(cmd, "rev_seq") == 0);
-        int look_up    =  (strcmp(cmd, "lookup")==0) ;
         int TOTAL_OPERATIONS = req_ins;
         int DELETE_OPERATIONS = (req_del > req_ins) ? req_ins : req_del;
         u32 prng_state = 123456789;
@@ -205,30 +203,45 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         }
 
         pr_info("[Latency-Test] Generating %s workload (Inserts: %d, Deletes: %d)...\n", cmd, TOTAL_OPERATIONS, DELETE_OPERATIONS);
-
         /* 1. Insert Phase */
+        u32 *insert_keys = vmalloc(TOTAL_OPERATIONS * sizeof(u32));
+        if (!insert_keys) {
+            pr_err("Failed to allocate insert_keys\n");
+            return -ENOMEM;
+        }
+
+        /*unique*/
+        for (i = 0; i < TOTAL_OPERATIONS; i++) {
+            insert_keys[i] = i;
+        }
+
+        /* shuffle */
+        if (is_random || full_rand) {
+            for (i = TOTAL_OPERATIONS - 1; i > 0; i--) {
+                u32 j = my_xorshift32(&prng_state) % (i + 1);
+                u32 temp = insert_keys[i];
+                insert_keys[i] = insert_keys[j];
+                insert_keys[j] = temp;
+            }
+        }
+
         for (i = 0; i < TOTAL_OPERATIONS; i++) {
             u64 key;
-            unsigned int rand_val;
-            struct my_node *rb_new, *wavl_new;
+            if (is_rev || is_rev_seq) key = TOTAL_OPERATIONS - 1 - i;
+            else if (is_seq) key = i;
+            else key = insert_keys[i]; 
 
-            if (is_random) key = my_xorshift32(&prng_state) % 1000000;
-            else if(full_rand) { get_random_bytes(&rand_val, sizeof(rand_val)); key = rand_val % 1000000; }
-            else if (is_rev || is_rev_seq) key = TOTAL_OPERATIONS - 1 - i;
-            else key = i;
+            struct my_node *rb_new = kmalloc(sizeof(struct my_node), GFP_KERNEL);
+            struct my_node *wavl_new = kmalloc(sizeof(struct my_node), GFP_KERNEL);
+            if (!rb_new || !wavl_new) continue;
 
-
-            rb_new = kmalloc(sizeof(struct my_node), GFP_KERNEL);
-            wavl_new = kmalloc(sizeof(struct my_node), GFP_KERNEL);
             rb_new->key = key; wavl_new->key = key;
             rb_nodes[i] = rb_new; wavl_nodes[i] = wavl_new;
-
 
             t_start = ktime_get_ns();
             do_rb_insert(rb_new, &my_test_tree);
             t_end = ktime_get_ns();
             rb_ins_time += (t_end - t_start);
-
 
             t_start = ktime_get_ns();
             do_wavl_insert(wavl_new, &my_wavl_tree);
@@ -237,6 +250,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
 
             indices[i] = i;
         }
+        vfree(insert_keys);
 
         /* 2. Traversal Phase (In-order) */
         {
@@ -256,7 +270,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         * Setup Deletion Indices 
         * ========================================== */
         for (i = 0; i < TOTAL_OPERATIONS; i++) {
-            if (is_random || full_rand||look_up) {  
+            if (is_random || full_rand) {  
                 indices[i] = i;
             } else {
                 int target_key;
@@ -276,7 +290,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         * shuffle
         * ========================================== */
 
-        if (is_random || full_rand ||look_up) { 
+        if (is_random || full_rand ) { 
             for (i = TOTAL_OPERATIONS - 1; i > 0; i--) {
                 u32 j = my_xorshift32(&prng_state) % (i + 1);
                 int temp = indices[i];
@@ -284,60 +298,44 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
                 indices[j] = temp;
             }
         }
-        if (look_up) {
-            for (i = 0; i < DELETE_OPERATIONS; i++) {
+            /* 🚀 模式 B：混合測試 (在逐漸刪除的破碎樹狀結構中，測量搜尋與刪除效能) */
+        for (i = 0; i < DELETE_OPERATIONS; i++) {
                 int target_idx = indices[i]; 
                 u64 target_key = rb_nodes[target_idx]->key; 
+                struct my_node *rb_target, *wavl_target;
 
+                /* ⏱️ 1. 在刪除前，先測量「目前的樹」尋找該節點要多久 */
                 t_start = ktime_get_ns(); 
-                do_search(target_key, &my_test_tree); 
+                rb_target = do_search(target_key, &my_test_tree); 
                 t_end = ktime_get_ns();
                 rb_lookup_time += (t_end - t_start);
 
                 t_start = ktime_get_ns(); 
-                do_search(target_key, &my_wavl_tree); 
+                wavl_target = do_search(target_key, &my_wavl_tree); 
                 t_end = ktime_get_ns();
                 wavl_lookup_time += (t_end - t_start);
-            }
 
-            pr_info("==================================================\n");
-            pr_info("     [ Pure Lookup Benchmark (Read-Only) ]\n");
-            pr_info("==================================================\n");
-            pr_info("Tree Size (Nodes) : %d\n", TOTAL_OPERATIONS);
-            pr_info("Total Lookups     : %d\n", DELETE_OPERATIONS);
-            pr_info("--------------------------------------------------\n");
-            pr_info("Metric (Avg)      |    Native RB   |    WAVL Tree\n");
-            pr_info("--------------------------------------------------\n");
-            pr_info("Avg Lookup Latency| %9llu ns | %9llu ns\n", 
-                DELETE_OPERATIONS > 0 ? rb_lookup_time / DELETE_OPERATIONS : 0, 
-                DELETE_OPERATIONS > 0 ? wavl_lookup_time / DELETE_OPERATIONS : 0);
-            pr_info("==================================================\n");
-
-        } 
-        else {
-            for (i = 0; i < DELETE_OPERATIONS; i++) {
-                int target_idx = indices[i]; 
-                
-                if (rb_nodes[target_idx]) {
+                /* ⏱️ 2. 測量刪除該節點 (Erase) 需要多久 */
+                /* 因為 Key 不重複，rb_target 絕對等於 rb_nodes[target_idx] */
+                if (rb_target) {
                     t_start = ktime_get_ns();
-                    rb_erase(&rb_nodes[target_idx]->node, &my_test_tree);
+                    rb_erase(&rb_target->node, &my_test_tree);
                     t_end = ktime_get_ns();
                     rb_del_time += (t_end - t_start);
                     
-                    kfree(rb_nodes[target_idx]); 
+                    kfree(rb_target); 
                     rb_nodes[target_idx] = NULL; 
                 }
-                if (wavl_nodes[target_idx]) {
+                if (wavl_target) {
                     t_start = ktime_get_ns();
-                    wavl_erase(&wavl_nodes[target_idx]->node, &my_wavl_tree);
+                    wavl_erase(&wavl_target->node, &my_wavl_tree);
                     t_end = ktime_get_ns();
                     wavl_del_time += (t_end - t_start);
 
-                    kfree(wavl_nodes[target_idx]);
+                    kfree(wavl_target);
                     wavl_nodes[target_idx] = NULL;
                 }
             }
-
             pr_info("==================================================\n");
             pr_info("     [ Bulk Latency Benchmark (ns) ]\n");
             pr_info("==================================================\n");
@@ -348,11 +346,10 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
             pr_info("Metric (Avg/Total)|    Native RB   |    WAVL Tree\n");
             pr_info("--------------------------------------------------\n");
             pr_info("Avg Insert Latency| %9llu ns | %9llu ns\n", TOTAL_OPERATIONS > 0 ? rb_ins_time / TOTAL_OPERATIONS : 0, TOTAL_OPERATIONS > 0 ? wavl_ins_time / TOTAL_OPERATIONS : 0);
+            pr_info("Avg Lookup Latency| %9llu ns | %9llu ns\n", DELETE_OPERATIONS > 0 ? rb_lookup_time / DELETE_OPERATIONS : 0, DELETE_OPERATIONS > 0 ? wavl_lookup_time / DELETE_OPERATIONS : 0);
             pr_info("Avg Erase Latency | %9llu ns | %9llu ns\n", DELETE_OPERATIONS > 0 ? rb_del_time / DELETE_OPERATIONS : 0, DELETE_OPERATIONS > 0 ? wavl_del_time / DELETE_OPERATIONS : 0);
             pr_info("Total Traversal   | %9llu ns | %9llu ns\n", rb_trav_time, wavl_trav_time);
             pr_info("==================================================\n");
-        }
-
         /* ==========================================================
          *  (Cleanup)
          * ========================================================== */
