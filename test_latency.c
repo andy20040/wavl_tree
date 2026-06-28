@@ -183,15 +183,18 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         int DELETE_OPERATIONS = (req_del > req_ins) ? req_ins : req_del;
         u32 prng_state = 123456789;
         int i;
-        
+        int run_rb = 1;
+        int run_wavl = 1;
+        if (strcmp(cmd, "random_rb") == 0) { run_wavl = 0; }
+        if (strcmp(cmd, "random_wavl") == 0) { run_rb = 0; }
         u64 t_start, t_end;
         u64 rb_ins_time = 0, wavl_ins_time = 0;
         u64 rb_del_time = 0, wavl_del_time = 0;
         u64 rb_lookup_time = 0, wavl_lookup_time = 0;
         u64 rb_trav_time = 0, wavl_trav_time = 0;
         
-        struct my_node **rb_nodes = vmalloc(TOTAL_OPERATIONS * sizeof(struct my_node *));
-        struct my_node **wavl_nodes = vmalloc(TOTAL_OPERATIONS * sizeof(struct my_node *));
+        struct my_node **rb_nodes = vzalloc(TOTAL_OPERATIONS * sizeof(struct my_node *));
+        struct my_node **wavl_nodes = vzalloc(TOTAL_OPERATIONS * sizeof(struct my_node *));
         int *indices = vmalloc(TOTAL_OPERATIONS * sizeof(int));
 
         if (!rb_nodes || !wavl_nodes || !indices) {
@@ -231,35 +234,44 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
             else if (is_seq) key = i;
             else key = insert_keys[i]; 
 
-            struct my_node *rb_new = kmalloc(sizeof(struct my_node), GFP_KERNEL);
-            struct my_node *wavl_new = kmalloc(sizeof(struct my_node), GFP_KERNEL);
-            if (!rb_new || !wavl_new) continue;
+            if (run_rb) {
+                struct my_node *rb_new = kmalloc(sizeof(struct my_node), GFP_KERNEL);
+                if (rb_new) {
+                    rb_new->key = key; 
+                    rb_nodes[i] = rb_new;
+                    t_start = ktime_get_ns();
+                    do_rb_insert(rb_new, &my_test_tree);
+                    t_end = ktime_get_ns();
+                    rb_ins_time += (t_end - t_start);
+                }
+            }
 
-            rb_new->key = key; wavl_new->key = key;
-            rb_nodes[i] = rb_new; wavl_nodes[i] = wavl_new;
-
-            t_start = ktime_get_ns();
-            do_rb_insert(rb_new, &my_test_tree);
-            t_end = ktime_get_ns();
-            rb_ins_time += (t_end - t_start);
-
-            t_start = ktime_get_ns();
-            do_wavl_insert(wavl_new, &my_wavl_tree);
-            t_end = ktime_get_ns();
-            wavl_ins_time += (t_end - t_start);
-
+            if (run_wavl) {
+                struct my_node *wavl_new = kmalloc(sizeof(struct my_node), GFP_KERNEL);
+                if (wavl_new) {
+                    wavl_new->key = key; 
+                    wavl_nodes[i] = wavl_new;
+                    t_start = ktime_get_ns();
+                    do_wavl_insert(wavl_new, &my_wavl_tree);
+                    t_end = ktime_get_ns();
+                    wavl_ins_time += (t_end - t_start);
+                }
+            }
             indices[i] = i;
         }
         vfree(insert_keys);
 
         /* 2. Traversal Phase (In-order) */
-        {
-            struct rb_node *node;
-            volatile unsigned long long dummy_sum = 0; 
+        struct rb_node *node;
+        volatile unsigned long long dummy_sum = 0; 
+        
+        if (run_rb) {
             t_start = ktime_get_ns();
             for (node = rb_first(&my_test_tree); node; node = rb_next(node)) dummy_sum += container_of(node, struct my_node, node)->key;
             t_end = ktime_get_ns(); rb_trav_time = (t_end - t_start);
+        }
 
+        if (run_wavl) {
             dummy_sum = 0;
             t_start = ktime_get_ns();
             for (node = rb_first(&my_wavl_tree); node; node = rb_next(node)) dummy_sum += container_of(node, struct my_node, node)->key;
@@ -298,42 +310,46 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
                 indices[j] = temp;
             }
         }
-        for (i = 0; i < DELETE_OPERATIONS; i++) {
-                int target_idx = indices[i]; 
-                u64 target_key = rb_nodes[target_idx]->key; 
-                struct my_node *rb_target, *wavl_target;
+            for (i = 0; i < DELETE_OPERATIONS; i++) {
+                    int target_idx = indices[i]; 
+                    u64 target_key = 0;
+                    if (run_rb && rb_nodes[target_idx]) target_key = rb_nodes[target_idx]->key;
+                    else if (run_wavl && wavl_nodes[target_idx]) target_key = wavl_nodes[target_idx]->key;
+                    else continue; 
 
-                /* ⏱️ 1. 在刪除前，先測量「目前的樹」尋找該節點要多久 */
-                t_start = ktime_get_ns(); 
-                rb_target = do_search(target_key, &my_test_tree); 
-                t_end = ktime_get_ns();
-                rb_lookup_time += (t_end - t_start);
+                    if (run_rb) {
+                        struct my_node *rb_target;
+                        t_start = ktime_get_ns(); 
+                        rb_target = do_search(target_key, &my_test_tree); 
+                        t_end = ktime_get_ns();
+                        rb_lookup_time += (t_end - t_start);
 
-                t_start = ktime_get_ns(); 
-                wavl_target = do_search(target_key, &my_wavl_tree); 
-                t_end = ktime_get_ns();
-                wavl_lookup_time += (t_end - t_start);
+                        if (rb_target) {
+                            t_start = ktime_get_ns();
+                            rb_erase(&rb_target->node, &my_test_tree);
+                            t_end = ktime_get_ns();
+                            rb_del_time += (t_end - t_start);
+                            kfree(rb_target); 
+                            rb_nodes[target_idx] = NULL; 
+                        }
+                    }
 
-                /* ⏱️ 2. 測量刪除該節點 (Erase) 需要多久 */
-                /* 因為 Key 不重複，rb_target 絕對等於 rb_nodes[target_idx] */
-                if (rb_target) {
-                    t_start = ktime_get_ns();
-                    rb_erase(&rb_target->node, &my_test_tree);
-                    t_end = ktime_get_ns();
-                    rb_del_time += (t_end - t_start);
-                    
-                    kfree(rb_target); 
-                    rb_nodes[target_idx] = NULL; 
-                }
-                if (wavl_target) {
-                    t_start = ktime_get_ns();
-                    wavl_erase(&wavl_target->node, &my_wavl_tree);
-                    t_end = ktime_get_ns();
-                    wavl_del_time += (t_end - t_start);
+                    if (run_wavl) {
+                        struct my_node *wavl_target;
+                        t_start = ktime_get_ns(); 
+                        wavl_target = do_search(target_key, &my_wavl_tree); 
+                        t_end = ktime_get_ns();
+                        wavl_lookup_time += (t_end - t_start);
 
-                    kfree(wavl_target);
-                    wavl_nodes[target_idx] = NULL;
-                }
+                        if (wavl_target) {
+                            t_start = ktime_get_ns();
+                            wavl_erase(&wavl_target->node, &my_wavl_tree);
+                            t_end = ktime_get_ns();
+                            wavl_del_time += (t_end - t_start);
+                            kfree(wavl_target);
+                            wavl_nodes[target_idx] = NULL;
+                        }
+                    }
             }
             pr_info("==================================================\n");
             pr_info("     [ Bulk Latency Benchmark (ns) ]\n");
@@ -355,16 +371,16 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         vfree(rb_nodes);
         vfree(wavl_nodes);
         vfree(indices);
-
-        struct my_node *pos, *n;
-        rbtree_postorder_for_each_entry_safe(pos, n, &my_test_tree, node) {
-            kfree(pos);
+        if (run_rb) {
+            struct my_node *pos, *n;
+            rbtree_postorder_for_each_entry_safe(pos, n, &my_test_tree, node) kfree(pos);
+            my_test_tree = RB_ROOT;
         }
-        rbtree_postorder_for_each_entry_safe(pos, n, &my_wavl_tree, node) {
-            kfree(pos);
+        if (run_wavl) {
+            struct my_node *pos, *n;
+            rbtree_postorder_for_each_entry_safe(pos, n, &my_wavl_tree, node) kfree(pos);
+            my_wavl_tree = RB_ROOT;
         }
-        my_test_tree = RB_ROOT;
-        my_wavl_tree = RB_ROOT;
     }
     else {
         pr_err("[Latency-Test] Unknown command.\n");
