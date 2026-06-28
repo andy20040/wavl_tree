@@ -21,7 +21,6 @@ comma_fmt = ticker.StrMethodFormatter('{x:,.0f}')
 phases = ['Insert', 'Lookup', 'Delete']
 my_palette = {'RB Tree': '#e63946', 'WAVL Tree': '#1d3557'}
 
-
 fig, axes = plt.subplots(1, 3, figsize=(22, 6))
 
 for i, phase in enumerate(phases):
@@ -40,8 +39,19 @@ for i, phase in enumerate(phases):
     ax.set_xticks(range(10, 101, 10)) 
     ax.legend(title='Data Structure', fontsize=11)
     
-    bottom, top = ax.get_ylim()
-    ax.set_ylim(bottom=0, top=top * 1.1)
+
+    min_val = phase_data['Value_ns'].min()
+    max_val = phase_data['Value_ns'].max()
+    
+
+    margin = (max_val - min_val) * 0.15
+    
+
+    if margin == 0:
+        margin = min_val * 0.05 if min_val != 0 else 10
+        
+    ax.set_ylim(min_val - margin, max_val + margin)
+
 
 filename = os.path.join(output_dir, 'latency_random_comparison.png')
 plt.tight_layout(pad=2.0)
