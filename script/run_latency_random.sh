@@ -1,5 +1,6 @@
 #!/bin/bash
 # script for recording insert delete latency and traversal time
+trap "echo -e '\n[!] Detected Ctrl+C, aborting entire script!'; exit 1" SIGINT
 RUNS=50
 N_FIXED=1000000
 RATIOS=(10 20 30 40 50 60 70 80 90 100) 
@@ -16,8 +17,8 @@ for RATIO in "${RATIOS[@]}"; do
     
     for (( i=1; i<=RUNS; i++ )); do
 
-        sudo dmesg -c > /dev/null
-        echo "random $N_FIXED $D_VAL" | sudo tee /proc/rbtree_latency_cmd > /dev/null
+         dmesg -c > /dev/null
+        echo "random $N_FIXED $D_VAL" |  tee /proc/rbtree_latency_cmd > /dev/null
         sleep 1 
         INS_LINE=$(dmesg | grep "Avg Insert Latency" | tail -n 1)
         LOOK_LINE=$(dmesg | grep "Avg Lookup Latency" | tail -n 1)

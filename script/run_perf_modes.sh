@@ -1,5 +1,5 @@
 #!/bin/bash
-
+trap "echo -e '\n[!] Detected Ctrl+C, aborting entire script!'; exit 1" SIGINT
 RUNS=20  # 硬體計數器穩定度高，20次足以消除雜訊
 N_FIXED=1000000
 RATIOS=(10 20 30 40 50 60 70 80 90 100) 
@@ -21,9 +21,9 @@ for MODE in "${MODES[@]}"; do
         for (( i=1; i<=RUNS; i++ )); do
             
             # 1. 測量 RB Tree
-            sudo dmesg -c > /dev/null
-            sudo perf stat -x ',' -e L1-dcache-load-misses,branch-misses \
-                -- sudo sh -c "echo '${MODE}_rb $N_FIXED $D_VAL' > /proc/rbtree_latency_cmd" 2> perf_rb.log
+            dmesg -c > /dev/null
+            perf stat -x ',' -e L1-dcache-load-misses,branch-misses \
+                -- sh -c "echo '${MODE}_rb $N_FIXED $D_VAL' > /proc/rbtree_latency_cmd" 2> perf_rb.log
             
             RB_L1=$(grep "L1-dcache-load-misses" perf_rb.log | cut -d',' -f1)
             RB_LLC=$(grep "LLC-load-misses" perf_rb.log | cut -d',' -f1)
@@ -34,9 +34,9 @@ for MODE in "${MODES[@]}"; do
             echo "$MODE,$RATIO,$i,RB Tree,Branch Misses,$RB_BR" >> $FILE_DIST
 
             # 2. 測量 WAVL Tree
-            sudo dmesg -c > /dev/null
-            sudo perf stat -x ',' -e L1-dcache-load-misses,branch-misses \
-                -- sudo sh -c "echo '${MODE}_wavl $N_FIXED $D_VAL' > /proc/rbtree_latency_cmd" 2> perf_wavl.log
+            dmesg -c > /dev/null
+            perf stat -x ',' -e L1-dcache-load-misses,branch-misses \
+                -- sh -c "echo '${MODE}_wavl $N_FIXED $D_VAL' > /proc/rbtree_latency_cmd" 2> perf_wavl.log
             
             WAVL_L1=$(grep "L1-dcache-load-misses" perf_wavl.log | cut -d',' -f1)
             WAVL_LLC=$(grep "LLC-load-misses" perf_wavl.log | cut -d',' -f1)

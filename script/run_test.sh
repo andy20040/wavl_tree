@@ -1,6 +1,6 @@
 #!/bin/bash
 #script for record rotation counts and rebalancing path
-
+trap "echo -e '\n[!] Detected Ctrl+C, aborting entire script!'; exit 1" SIGINT
 MODES=("seq" "reverse" "seq_rev" "rev_seq")
 
 
@@ -22,8 +22,8 @@ for MODE in "${MODES[@]}"; do
     echo " testing : $MODE (Insert Scaling)..."
     for (( N=10000; N<=1000000; N+=20000 )); do
         
-        sudo dmesg -c > /dev/null
-        echo "$MODE $N $D_FIXED" | sudo tee /proc/rbtree_test_cmd > /dev/null
+        dmesg -c > /dev/null
+        echo "$MODE $N $D_FIXED" | tee /proc/rbtree_test_cmd > /dev/null
         sleep 2
         
         ROT_LINES=$(dmesg | grep "Total Rotation Counts")
@@ -55,8 +55,8 @@ for MODE in "${MODES[@]}"; do
     echo "  testing : $MODE (Delete Scaling)..."
     for (( D=10000; D<=1000000; D+=20000 )); do
         
-        sudo dmesg -c > /dev/null
-        echo "$MODE $N_FIXED $D" | sudo tee /proc/rbtree_test_cmd > /dev/null
+        dmesg -c > /dev/null
+        echo "$MODE $N_FIXED $D" | tee /proc/rbtree_test_cmd > /dev/null
         sleep 3
         
         ROT_LINES=$(dmesg | grep "Total Rotation Counts")

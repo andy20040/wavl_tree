@@ -1,5 +1,6 @@
 #!/bin/bash
 # script for recording insert delete latency and traversal time
+trap "echo -e '\n[!] Detected Ctrl+C, aborting entire script!'; exit 1" SIGINT
 MODES=("seq" "reverse" "seq_rev" "rev_seq")
 FILE_ALL="../trace_data/latency_results_modes.csv"
 
@@ -17,8 +18,8 @@ for MODE in "${MODES[@]}"; do
     echo " Testing: $MODE (Insert Scaling)..."
     for (( N=10000; N<=1000000; N+=20000 )); do
         
-        sudo dmesg -c > /dev/null
-        echo "$MODE $N $D_FIXED" | sudo tee /proc/rbtree_latency_cmd > /dev/null
+        dmesg -c > /dev/null
+        echo "$MODE $N $D_FIXED" |  tee /proc/rbtree_latency_cmd > /dev/null
         sleep 0.5
         
         INS_LINE=$(dmesg | grep "Avg Insert Latency" | head -n 1)
@@ -44,8 +45,8 @@ for MODE in "${MODES[@]}"; do
     echo " Testing: $MODE (Delete & Traversal Scaling)..."
     for (( D=10000; D<=1000000; D+=20000 )); do
         
-        sudo dmesg -c > /dev/null
-        echo "$MODE $N_FIXED $D" | sudo tee /proc/rbtree_latency_cmd > /dev/null
+        dmesg -c > /dev/null
+        echo "$MODE $N_FIXED $D" |  tee /proc/rbtree_latency_cmd > /dev/null
         sleep 1
         
         LOOK_LINE=$(dmesg | grep "Avg Lookup Latency" | tail -n 1)

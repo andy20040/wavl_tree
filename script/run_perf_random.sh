@@ -1,5 +1,5 @@
 #!/bin/bash
-
+trap "echo -e '\n[!] Detected Ctrl+C, aborting entire script!'; exit 1" SIGINT
 RUNS=50  
 N_FIXED=1000000
 RATIOS=(10 20 30 40 50 60 70 80 90 100) 
@@ -17,9 +17,9 @@ for RATIO in "${RATIOS[@]}"; do
     for (( i=1; i<=RUNS; i++ )); do
         
 
-        sudo dmesg -c > /dev/null
-        sudo perf stat -x ',' -e L1-dcache-load-misses,branch-misses \
-            -- sudo sh -c "echo 'random_rb $N_FIXED $D_VAL' > /proc/rbtree_latency_cmd" 2> perf_rb.log
+        dmesg -c > /dev/null
+        perf stat -x ',' -e L1-dcache-load-misses,branch-misses \
+            -- sh -c "echo 'random_rb $N_FIXED $D_VAL' > /proc/rbtree_latency_cmd" 2> perf_rb.log
         
         RB_L1=$(grep "L1-dcache-load-misses" perf_rb.log | cut -d',' -f1)
         RB_LLC=$(grep "LLC-load-misses" perf_rb.log | cut -d',' -f1)
@@ -28,9 +28,9 @@ for RATIO in "${RATIOS[@]}"; do
         echo "$RATIO,$i,RB Tree,L1 Misses,$RB_L1" >> $FILE_DIST
         echo "$RATIO,$i,RB Tree,LLC Misses,$RB_LLC" >> $FILE_DIST
         echo "$RATIO,$i,RB Tree,Branch Misses,$RB_BR" >> $FILE_DIST
-        sudo dmesg -c > /dev/null
-        sudo perf stat -x ',' -e L1-dcache-load-misses,branch-misses \
-            -- sudo sh -c "echo 'random_wavl $N_FIXED $D_VAL' > /proc/rbtree_latency_cmd" 2> perf_wavl.log
+        dmesg -c > /dev/null
+        perf stat -x ',' -e L1-dcache-load-misses,branch-misses \
+            -- sh -c "echo 'random_wavl $N_FIXED $D_VAL' > /proc/rbtree_latency_cmd" 2> perf_wavl.log
         
         WAVL_L1=$(grep "L1-dcache-load-misses" perf_wavl.log | cut -d',' -f1)
         WAVL_LLC=$(grep "LLC-load-misses" perf_wavl.log | cut -d',' -f1)
