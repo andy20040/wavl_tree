@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#script for record rotation counts and rebalancing path
 
 MODES=("seq" "reverse" "seq_rev" "rev_seq")
 

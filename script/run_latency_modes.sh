@@ -1,5 +1,5 @@
 #!/bin/bash
-
+# script for recording insert delete latency and traversal time
 MODES=("seq" "reverse" "seq_rev" "rev_seq")
 FILE_ALL="../latency_results_modes.csv"
 
@@ -36,12 +36,12 @@ done
 #  Delete Phase (fixed N=1,000,000，changing D)
 # =====================================================================
 echo "=================================================="
-echo " Starting Mode Scaling Benchmark (Delete Phase)"
+echo " Starting Mode Scaling Benchmark (Delete Phase & Traversal)"
 echo "=================================================="
 N_FIXED=1000000
 
 for MODE in "${MODES[@]}"; do
-    echo " Testing: $MODE (Delete Scaling)..."
+    echo " Testing: $MODE (Delete & Traversal Scaling)..."
     for (( D=10000; D<=1000000; D+=20000 )); do
         
         sudo dmesg -c > /dev/null
@@ -50,6 +50,7 @@ for MODE in "${MODES[@]}"; do
         
         LOOK_LINE=$(dmesg | grep "Avg Lookup Latency" | tail -n 1)
         DEL_LINE=$(dmesg | grep "Avg Erase Latency" | tail -n 1)
+        TRAV_LINE=$(dmesg | grep "Total Traversal" | tail -n 1)
         
         RB_LOOK=$(echo "$LOOK_LINE" | awk -F'|' '{print $2}' | awk '{print $1}')
         WAVL_LOOK=$(echo "$LOOK_LINE" | awk -F'|' '{print $3}' | awk '{print $1}')
@@ -57,8 +58,12 @@ for MODE in "${MODES[@]}"; do
         RB_DEL=$(echo "$DEL_LINE" | awk -F'|' '{print $2}' | awk '{print $1}')
         WAVL_DEL=$(echo "$DEL_LINE" | awk -F'|' '{print $3}' | awk '{print $1}')
         
+        RB_TRAV=$(echo "$TRAV_LINE" | awk -F'|' '{print $2}' | awk '{print $1}')
+        WAVL_TRAV=$(echo "$TRAV_LINE" | awk -F'|' '{print $3}' | awk '{print $1}')
+        
         echo "$MODE,$N_FIXED,$D,Lookup,$RB_LOOK,$WAVL_LOOK" >> $FILE_ALL
         echo "$MODE,$N_FIXED,$D,Delete,$RB_DEL,$WAVL_DEL" >> $FILE_ALL
+        echo "$MODE,$N_FIXED,$D,Traversal,$RB_TRAV,$WAVL_TRAV" >> $FILE_ALL 
     done
 done
 

@@ -18,7 +18,7 @@ plt.style.use('seaborn-v0_8-whitegrid')
 comma_fmt = ticker.StrMethodFormatter('{x:,.0f}')
 
 
-phases = ['Insert', 'Lookup', 'Delete']
+phases = ['Insert', 'Lookup', 'Delete', 'Traversal']
 my_palette = {'RB Tree': '#e63946', 'WAVL Tree': '#1d3557'}
 
 fig, axes = plt.subplots(1, 3, figsize=(22, 6))
@@ -31,7 +31,12 @@ for i, phase in enumerate(phases):
     ax = axes[i]
     sns.lineplot(x='Ratio', y='Value_ns', hue='Tree', data=phase_data, ax=ax,
                  errorbar='sd', marker='o', markersize=8, linewidth=2.5, palette=my_palette)
-
+    if phase == 'Traversal':
+        ax.set_title(f'[{phase} Phase] Total Latency vs Deletion Ratio', fontsize=14, pad=15)
+        ax.set_ylabel('Total Latency (ns)', fontsize=12)
+    else:
+        ax.set_title(f'[{phase} Phase] Avg Latency vs Deletion Ratio', fontsize=14, pad=15)
+        ax.set_ylabel('Average Latency (ns)', fontsize=12)
     ax.set_title(f'[{phase} Phase] Latency vs Deletion Ratio', fontsize=14, pad=15)
     ax.set_xlabel('Deletion Ratio (%)', fontsize=12)
     ax.set_ylabel('Latency (ns)', fontsize=12)

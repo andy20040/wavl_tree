@@ -18,10 +18,11 @@ plt.style.use('seaborn-v0_8-whitegrid')
 comma_fmt = ticker.StrMethodFormatter('{x:,.0f}')
 
 
-metrics = ['L1 Misses', 'LLC Misses', 'Branch Misses']
+metrics = ['L1 Misses', 'Branch Misses']
 my_palette = {'RB Tree': '#e63946', 'WAVL Tree': '#1d3557'}
 
-fig, axes = plt.subplots(1, 3, figsize=(22, 6))
+
+fig, axes = plt.subplots(1, 2, figsize=(16, 6))
 
 for i, metric in enumerate(metrics):
     metric_data = df[df['Metric'] == metric]
@@ -44,8 +45,8 @@ for i, metric in enumerate(metrics):
     max_val = metric_data['Value'].max()
     margin = (max_val - min_val) * 0.15
     if margin == 0:
-        margin = min_val * 0.05
-    ax.set_ylim(min_val - margin, max_val + margin)
+        margin = min_val * 0.05 if min_val != 0 else 10
+    ax.set_ylim(max(0, min_val - margin), max_val + margin)
 
 filename = os.path.join(output_dir, 'hardware_perf_comparison.png')
 plt.tight_layout(pad=2.0)

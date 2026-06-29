@@ -170,23 +170,22 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
     /* ==========================================================
      *  (Random / Seq / Reverse)
      * ========================================================== */
-    else if (strcmp(cmd, "random") == 0 || strcmp(cmd, "randomseed") == 0 || strcmp(cmd, "seq") == 0 ||
-             strcmp(cmd, "reverse") == 0 || strcmp(cmd, "seq_rev") == 0 || strcmp(cmd, "rev_seq") == 0) {
-        
-        int is_random  = (strcmp(cmd, "randomseed") == 0);
-        int full_rand  = (strcmp(cmd, "random") == 0);
-        int is_seq     = (strcmp(cmd, "seq") == 0);
-        int is_rev     = (strcmp(cmd, "reverse") == 0);
-        int is_seq_rev = (strcmp(cmd, "seq_rev") == 0);
-        int is_rev_seq = (strcmp(cmd, "rev_seq") == 0);
+    else if (strncmp(cmd, "random", 6) == 0 || strncmp(cmd, "seq", 3) == 0 || strncmp(cmd, "rev", 3) == 0) {
+        int is_seq_rev = (strncmp(cmd, "seq_rev", 7) == 0);
+        int is_rev_seq = (strncmp(cmd, "rev_seq", 7) == 0);
+
+        int is_seq     = (strncmp(cmd, "seq", 3) == 0 && !is_seq_rev);
+        int is_rev     = (strncmp(cmd, "rev", 3) == 0 && !is_rev_seq);
+        int is_random  = (strncmp(cmd, "randomseed", 10) == 0);
+        int full_rand  = (strncmp(cmd, "random", 6) == 0 && !is_random);
         int TOTAL_OPERATIONS = req_ins;
         int DELETE_OPERATIONS = (req_del > req_ins) ? req_ins : req_del;
         u32 prng_state = 123456789;
         int i;
         int run_rb = 1;
         int run_wavl = 1;
-        if (strcmp(cmd, "random_rb") == 0) { run_wavl = 0; }
-        if (strcmp(cmd, "random_wavl") == 0) { run_rb = 0; }
+        if (strstr(cmd, "_rb") != NULL) { run_wavl = 0; }
+        if (strstr(cmd, "_wavl") != NULL) { run_rb = 0; }
         u64 t_start, t_end;
         u64 rb_ins_time = 0, wavl_ins_time = 0;
         u64 rb_del_time = 0, wavl_del_time = 0;
@@ -213,7 +212,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
             return -ENOMEM;
         }
 
-        /*unique*/
+        /*unique key*/
         for (i = 0; i < TOTAL_OPERATIONS; i++) {
             insert_keys[i] = i;
         }
@@ -261,22 +260,7 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         }
         vfree(insert_keys);
 
-        /* 2. Traversal Phase (In-order) */
-        struct rb_node *node;
-        volatile unsigned long long dummy_sum = 0; 
-        
-        if (run_rb) {
-            t_start = ktime_get_ns();
-            for (node = rb_first(&my_test_tree); node; node = rb_next(node)) dummy_sum += container_of(node, struct my_node, node)->key;
-            t_end = ktime_get_ns(); rb_trav_time = (t_end - t_start);
-        }
 
-        if (run_wavl) {
-            dummy_sum = 0;
-            t_start = ktime_get_ns();
-            for (node = rb_first(&my_wavl_tree); node; node = rb_next(node)) dummy_sum += container_of(node, struct my_node, node)->key;
-            t_end = ktime_get_ns(); wavl_trav_time = (t_end - t_start);
-        }
 
         /* ==========================================
         * Setup Deletion Indices 
@@ -350,7 +334,23 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
                             wavl_nodes[target_idx] = NULL;
                         }
                     }
-            }
+        }
+        /* . Traversal Phase (In-order) */
+        struct rb_node *node;
+        volatile unsigned long long dummy_sum = 0; 
+        
+        if (run_rb) {
+            t_start = ktime_get_ns();
+            for (node = rb_first(&my_test_tree); node; node = rb_next(node)) dummy_sum += container_of(node, struct my_node, node)->key;
+            t_end = ktime_get_ns(); rb_trav_time = (t_end - t_start);
+        }
+
+        if (run_wavl) {
+            dummy_sum = 0;
+            t_start = ktime_get_ns();
+            for (node = rb_first(&my_wavl_tree); node; node = rb_next(node)) dummy_sum += container_of(node, struct my_node, node)->key;
+            t_end = ktime_get_ns(); wavl_trav_time = (t_end - t_start);
+        }
             pr_info("==================================================\n");
             pr_info("     [ Bulk Latency Benchmark (ns) ]\n");
             pr_info("==================================================\n");

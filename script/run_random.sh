@@ -1,5 +1,5 @@
 #!/bin/bash
-
+# script for record rotation counts and rebalancing path
 RUNS=50
 N_FIXED=1000000
 RATIOS=(10 20 30 40 50 60 70 80 90 100) 

@@ -17,7 +17,7 @@ except FileNotFoundError:
         exit()
 
 target_modes = ['seq', 'reverse', 'seq_rev', 'rev_seq']
-phases = ['Insert', 'Lookup', 'Delete']
+phases = ['Insert', 'Lookup', 'Delete', 'Traversal']
 
 plt.style.use('seaborn-v0_8-whitegrid')
 comma_fmt = ticker.StrMethodFormatter('{x:,.0f}')
@@ -48,11 +48,24 @@ for mode in target_modes:
         
         ax.set_title(f'[{mode.upper()} - {phase}] Execution Latency', fontsize=14, pad=15)
         ax.set_xlabel(x_label, fontsize=12) 
-        ax.set_ylabel('Latency (ns)', fontsize=12)
+        
+
+        if phase == 'Traversal':
+            ax.set_ylabel('Total Latency (ns)', fontsize=12)
+        else:
+            ax.set_ylabel('Average Latency (ns)', fontsize=12)
+            
         ax.grid(True, linestyle='--', alpha=0.7)
         
         max_lat = max(subset['RB_Latency_ns'].max(), subset['WAVL_Latency_ns'].max())
-        ax.set_ylim(bottom=0, top=max_lat * 1.1)
+        min_lat = min(subset['RB_Latency_ns'].min(), subset['WAVL_Latency_ns'].min())
+        
+
+        margin = (max_lat - min_lat) * 0.15
+        if margin == 0:
+            margin = max_lat * 0.05 if max_lat != 0 else 10
+            
+        ax.set_ylim(bottom=max(0, min_lat - margin), top=max_lat + margin)
         ax.legend(fontsize=11)
         
         ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))

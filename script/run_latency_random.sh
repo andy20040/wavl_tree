@@ -1,5 +1,5 @@
 #!/bin/bash
-
+# script for recording insert delete latency and traversal time
 RUNS=50
 N_FIXED=1000000
 RATIOS=(10 20 30 40 50 60 70 80 90 100) 
@@ -22,7 +22,7 @@ for RATIO in "${RATIOS[@]}"; do
         INS_LINE=$(dmesg | grep "Avg Insert Latency" | tail -n 1)
         LOOK_LINE=$(dmesg | grep "Avg Lookup Latency" | tail -n 1)
         DEL_LINE=$(dmesg | grep "Avg Erase Latency" | tail -n 1)
-
+        TRAV_LINE=$(dmesg | grep "Total Traversal" | tail -n 1)
 
         # format : Avg Insert Latency|       292 ns |       283 ns
         RB_INS=$(echo "$INS_LINE" | awk -F'|' '{print $2}' | awk '{print $1}')
@@ -34,6 +34,10 @@ for RATIO in "${RATIOS[@]}"; do
         RB_DEL=$(echo "$DEL_LINE" | awk -F'|' '{print $2}' | awk '{print $1}')
         WAVL_DEL=$(echo "$DEL_LINE" | awk -F'|' '{print $3}' | awk '{print $1}')
 
+        RB_TRAV=$(echo "$TRAV_LINE" | awk -F'|' '{print $2}' | awk '{print $1}')
+        WAVL_TRAV=$(echo "$TRAV_LINE" | awk -F'|' '{print $3}' | awk '{print $1}')
+
+
         echo "$RATIO,$i,Insert,RB Tree,Latency,$RB_INS" >> $FILE_DIST
         echo "$RATIO,$i,Insert,WAVL Tree,Latency,$WAVL_INS" >> $FILE_DIST
         
@@ -43,6 +47,8 @@ for RATIO in "${RATIOS[@]}"; do
         echo "$RATIO,$i,Delete,RB Tree,Latency,$RB_DEL" >> $FILE_DIST
         echo "$RATIO,$i,Delete,WAVL Tree,Latency,$WAVL_DEL" >> $FILE_DIST
 
+        echo "$RATIO,$i,Traversal,RB Tree,Latency,$RB_TRAV" >> $FILE_DIST
+        echo "$RATIO,$i,Traversal,WAVL Tree,Latency,$WAVL_TRAV" >> $FILE_DIST
         if (( i % 10 == 0 )); then
             echo "  Completed $i / $RUNS runs"
         fi
