@@ -1,7 +1,7 @@
 #!/bin/bash
 # script for recording insert delete latency and traversal time
 MODES=("seq" "reverse" "seq_rev" "rev_seq")
-FILE_ALL="../latency_results_modes.csv"
+FILE_ALL="../trace_data/latency_results_modes.csv"
 
 echo "Mode,N,D,Phase,RB_Latency_ns,WAVL_Latency_ns" > $FILE_ALL
 

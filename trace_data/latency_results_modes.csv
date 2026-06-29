@@ -1,0 +1,8 @@
+Mode,N,D,Phase,RB_Latency_ns,WAVL_Latency_ns
+seq,10000,1,Insert,1024,1041
+seq,30000,1,Insert,1033,1044
+seq,50000,1,Insert,1014,1032
+seq,70000,1,Insert,1029,1046
+seq,90000,1,Insert,1024,1040
+seq,110000,1,Insert,1038,1048
+seq,130000,1,Insert,1036,1046
