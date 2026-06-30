@@ -8,7 +8,7 @@ if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
 try:
-    df = pd.read_csv('../latency_results_modes.csv')
+    df = pd.read_csv('../trace_data/latency_results_modes.csv')
 except FileNotFoundError:
     try:
         df = pd.read_csv('latency_results_modes.csv') 
