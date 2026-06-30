@@ -1,6 +1,7 @@
 #!/bin/bash
 # script for recording insert delete latency and traversal time
 trap "echo -e '\n[!] Detected Ctrl+C, aborting entire script!'; exit 1" SIGINT
+taskset -pc 0 $$ > /dev/null
 MODES=("seq" "reverse" "seq_rev" "rev_seq")
 FILE_ALL="../trace_data/latency_results_modes.csv"
 

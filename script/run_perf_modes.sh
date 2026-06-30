@@ -1,5 +1,6 @@
 #!/bin/bash
 trap "echo -e '\n[!] Detected Ctrl+C, aborting entire script!'; exit 1" SIGINT
+taskset -pc 0 $$ > /dev/null
 RUNS=20  
 N_FIXED=1000000
 RATIOS=(10 20 30 40 50 60 70 80 90 100) 
