@@ -1,2 +1,3 @@
-3794704,,L1-dcache-load-misses,6079573151,100.00,,
-29818787,,branch-misses,6079573151,100.00,,
+sh: Interrupt
+4849132,,L1-dcache-load-misses,6083656742,100.00,,
+30038816,,branch-misses,6083656742,100.00,,

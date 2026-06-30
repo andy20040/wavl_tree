@@ -767,6 +767,132 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         my_test_tree = RB_ROOT;
         my_wavl_tree = RB_ROOT;
     }
+    else if (strncmp(cmd, "mixed", 5) == 0) {
+        int POOL_SIZE = req_ins;
+        int MIXED_OPS = req_del;
+        u32 prng_state = 123456789;
+        int i, cpu;
+
+        u64 rb_rots = 0, rb_path = 0;
+        u64 wavl_rots = 0, wavl_path = 0;
+        u64 total_inserts = 0, total_deletes = 0;
+
+        u8 *in_tree = vzalloc(POOL_SIZE * sizeof(u8));
+        if (!in_tree) return -ENOMEM;
+
+        pr_info("[RB-Test] Starting Mixed workload (Pool: %d, Ops: %d)...\n", POOL_SIZE, MIXED_OPS);
+
+        for (i = 0; i < POOL_SIZE / 2; i++) {
+            u32 random_key = my_xorshift32(&prng_state) % POOL_SIZE;
+            if (!in_tree[random_key]) {
+                insert_rb_node(random_key);
+                insert_wavl_node(random_key);
+                in_tree[random_key] = 1;
+            }
+        }
+        for_each_possible_cpu(cpu) {
+            per_cpu(baseline_rotations, cpu) = 0;
+            per_cpu(baseline_path_length, cpu) = 0;
+            per_cpu(wavl_rotations, cpu) = 0;
+            per_cpu(wavl_path_length, cpu) = 0;
+        }
+        memset(rb_ins_hist, 0, sizeof(rb_ins_hist));
+        memset(wavl_ins_hist, 0, sizeof(wavl_ins_hist));
+        memset(rb_del_hist, 0, sizeof(rb_del_hist));
+        memset(wavl_del_hist, 0, sizeof(wavl_del_hist));
+
+        for (i = 0; i < MIXED_OPS; i++) {
+            u32 random_key = my_xorshift32(&prng_state) % POOL_SIZE;
+
+            if (in_tree[random_key]) {
+
+                total_deletes++;
+                struct my_node *rb_target = search_rb_node(random_key);
+                struct my_node *wavl_target = search_wavl_node(random_key);
+
+                if (rb_target && wavl_target) {
+                    old_rots = 0; for_each_possible_cpu(cpu) old_rots += per_cpu(baseline_rotations, cpu);
+                    my_rb_erase(&rb_target->node, &my_test_tree);
+                    kfree(rb_target);
+                    new_rots = 0; for_each_possible_cpu(cpu) new_rots += per_cpu(baseline_rotations, cpu);
+                    diff = new_rots - old_rots;
+                    rb_del_hist[diff > 3 ? 3 : diff]++;
+                    old_rots = 0; for_each_possible_cpu(cpu) old_rots += per_cpu(wavl_rotations, cpu);
+                    wavl_erase(&wavl_target->node, &my_wavl_tree);
+                    kfree(wavl_target);
+                    new_rots = 0; for_each_possible_cpu(cpu) new_rots += per_cpu(wavl_rotations, cpu);
+                    diff = new_rots - old_rots;
+                    wavl_del_hist[diff > 3 ? 3 : diff]++;
+                }
+                in_tree[random_key] = 0;
+            } else {
+                total_inserts++;
+                
+                old_rots = 0; for_each_possible_cpu(cpu) old_rots += per_cpu(baseline_rotations, cpu);
+                insert_rb_node(random_key);
+                new_rots = 0; for_each_possible_cpu(cpu) new_rots += per_cpu(baseline_rotations, cpu);
+                diff = new_rots - old_rots;
+                rb_ins_hist[diff > 3 ? 3 : diff]++;
+
+                old_rots = 0; for_each_possible_cpu(cpu) old_rots += per_cpu(wavl_rotations, cpu);
+                insert_wavl_node(random_key);
+                new_rots = 0; for_each_possible_cpu(cpu) new_rots += per_cpu(wavl_rotations, cpu);
+                diff = new_rots - old_rots;
+                wavl_ins_hist[diff > 3 ? 3 : diff]++;
+
+                in_tree[random_key] = 1;
+            }
+        }
+        for_each_possible_cpu(cpu) {
+            rb_rots += per_cpu(baseline_rotations, cpu);
+            rb_path += per_cpu(baseline_path_length, cpu);
+            wavl_rots += per_cpu(wavl_rotations, cpu);
+            wavl_path += per_cpu(wavl_path_length, cpu);
+        }
+        pr_info("==================================================\n");
+        pr_info("          [ Mixed Workload Replay ]\n");
+        pr_info("==================================================\n");
+        pr_info("Metric                     |  RB Tree  | WAVL Tree\n");
+        pr_info("--------------------------------------------------\n");
+        pr_info("Total Rotation Counts      | %9llu | %9llu\n", rb_rots, wavl_rots);
+        pr_info("Total Rebalancing Path Len | %9llu | %9llu\n", rb_path, wavl_path);
+        pr_info("==================================================\n");
+        pr_info("          [ Workload Distribution ]\n");
+        pr_info("==================================================\n");
+        pr_info("Total Mixed Ops        : %d\n", MIXED_OPS);
+        pr_info("Total Inserts          : %llu\n", total_inserts);
+        pr_info("Total Deletes          : %llu\n", total_deletes);
+        pr_info("==================================================\n");
+        pr_info("         [ Insert Operations Cost  ]\n");
+        pr_info("==================================================\n");
+        pr_info("Rotations |      RB Tree      |     WAVL Tree\n");
+        pr_info("--------------------------------------------------\n");
+        pr_info("  0 rots  | %17llu | %17llu\n", rb_ins_hist[0], wavl_ins_hist[0]);
+        pr_info("  1 rots  | %17llu | %17llu\n", rb_ins_hist[1], wavl_ins_hist[1]);
+        pr_info("  2 rots  | %17llu | %17llu\n", rb_ins_hist[2], wavl_ins_hist[2]);
+        pr_info(" >=3 rots | %17llu | %17llu\n", rb_ins_hist[3], wavl_ins_hist[3]);
+        pr_info("==================================================\n");
+        pr_info("          [ Delete Operations Cost ]\n");
+        pr_info("==================================================\n");
+        pr_info("Rotations |      RB Tree      |     WAVL Tree\n");
+        pr_info("--------------------------------------------------\n");
+        pr_info("  0 rots  | %17llu | %17llu\n", rb_del_hist[0], wavl_del_hist[0]);
+        pr_info("  1 rots  | %17llu | %17llu\n", rb_del_hist[1], wavl_del_hist[1]);
+        pr_info("  2 rots  | %17llu | %17llu\n", rb_del_hist[2], wavl_del_hist[2]);
+        pr_info(" >=3 rots | %17llu | %17llu\n", rb_del_hist[3], wavl_del_hist[3]);
+        pr_info("==================================================\n");
+        vfree(in_tree);
+        struct rb_node *node;
+        struct my_node *pos, *n;
+        rbtree_postorder_for_each_entry_safe(pos, n, &my_test_tree, node) {
+            kfree(pos);
+        }
+        rbtree_postorder_for_each_entry_safe(pos, n, &my_wavl_tree, node) {
+            kfree(pos);
+        }
+        my_test_tree = RB_ROOT;
+        my_wavl_tree = RB_ROOT;
+    }
     else if (strcmp(cmd, "random") == 0 ||strcmp(cmd, "randomseed") == 0 || strcmp(cmd, "seq") == 0 ||
              strcmp(cmd, "reverse") == 0 || strcmp(cmd, "seq_rev") == 0 || 
              strcmp(cmd, "rev_seq") == 0){
