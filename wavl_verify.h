@@ -56,7 +56,40 @@ static inline int verify_leftmost(struct rb_root_cached *root) {
     }
     return 0;
 }
+static inline int wavl_verify_reconstruct_rank(struct rb_node *node) {
+    if (!node) return -1; // 虛擬節點的 Rank 永遠是 -1
 
+    int rank_l = wavl_verify_reconstruct_rank(node->rb_left);
+    int rank_r = wavl_verify_reconstruct_rank(node->rb_right);
+
+    if (rank_l == -999 || rank_r == -999) return -999;
+
+    /* check from left */
+
+    unsigned long parity_l = (rank_l == -1) ? 1UL : (rank_l & 1UL);
+    int diff_l = (wavl_parity(node) == parity_l) ? 2 : 1;
+    int expected_rank_l = rank_l + diff_l;
+
+    /* check from right */
+    unsigned long parity_r = (rank_r == -1) ? 1UL : (rank_r & 1UL);
+    int diff_r = (wavl_parity(node) == parity_r) ? 2 : 1;
+    int expected_rank_r = rank_r + diff_r;
+
+    /* match */
+    if (expected_rank_l != expected_rank_r) {
+        pr_err("[WAVL ERROR] Rank Mismatch at node! Left implies Rank %d, Right implies Rank %d\n", 
+                expected_rank_l, expected_rank_r);
+        return -999;
+    }
+
+    /*  2,2-leaf */
+    if (!node->rb_left && !node->rb_right && expected_rank_l != 0) {
+        pr_err("[WAVL ERROR] Found illegal leaf with Rank %d (2,2-leaf violation)\n", expected_rank_l);
+        return -999;
+    }
+
+    return expected_rank_l;
+}
 
 static inline int verify_wavl_properties(struct rb_root_cached *root, int nodecount, unsigned long insertion_count) {
     struct rb_node *node;
@@ -77,9 +110,6 @@ static inline int verify_wavl_properties(struct rb_root_cached *root, int nodeco
             }
         }
         last_node = node;
-        unsigned long diff_l = wavl_rank_diff(node, node->rb_left);
-        unsigned long diff_r = wavl_rank_diff(node, node->rb_right);
-
         /* Property 2: parent child pointer Consistency */
         if (node->rb_left && wavl_parent(node->rb_left) != node) {
             pr_err("[ERROR] Parent mismatch! Key %d left\n", my_node->key);
@@ -89,28 +119,15 @@ static inline int verify_wavl_properties(struct rb_root_cached *root, int nodeco
             pr_err("[ERROR] Parent mismatch! Key %d right\n", my_node->key);
             error = 1;
         }
-
-        /* Property 3: leaf base case check */
-        if(wavl_is_leaf(node)){
-            if (diff_l != 1 || diff_r != 1) {
-                pr_err("[ERROR] leaf node rank not correct！ Key %d is leaf，but rank diff is (left:%lu, right:%lu)\n", 
-                       my_node->key, diff_l, diff_r);
-                error = 1;
-            }
-        }
-
-        /* Property 4: WAVL rank property */
-        if (diff_l != 1 && diff_l != 2) {
-            pr_err("[ERROR] Rank Violation! Key %d left diff is %lu\n", my_node->key, diff_l);
-            error = 1;
-        }
-        if (diff_r != 1 && diff_r != 2) {
-            pr_err("[ERROR] Rank Violation! Key %d right diff is %lu\n", my_node->key, diff_r);
-            error = 1;
-        }
         count++;
     }
-
+    /* Property 3: leaf base case check */
+    /* Property 4: WAVL rank property */
+    int final_rank = wavl_verify_reconstruct_rank(root->rb_root.rb_node);
+    if (final_rank == -999) {
+        pr_err("[WAVL ERROR] Verification FAILED. The tree is structurally broken.\n");
+        return -1;
+    }
     /* Property 5: WAVL height property & Degradation Analysis */
     if (nodecount > 0 && insertion_count > 0) {
         int h = get_max_height(root->rb_root.rb_node);
@@ -174,9 +191,6 @@ static inline int verify_interval_wavl_properties(struct rb_root_cached *root) {
     int error = 0; 
     for (node = rb_first(&root->rb_root); node; node = rb_next(node)) {
         struct my_wavl_interval_node *my_node = container_of(node, struct my_wavl_interval_node, node);
-        unsigned long diff_l = wavl_rank_diff(node, node->rb_left);
-        unsigned long diff_r = wavl_rank_diff(node, node->rb_right);
-
         if (node->rb_left && wavl_parent(node->rb_left) != node) {
             pr_err("[ERROR] Parent mismatch! Interval [%lu, %lu] left\n", my_node->start, my_node->end);
             error = 1;
@@ -185,18 +199,17 @@ static inline int verify_interval_wavl_properties(struct rb_root_cached *root) {
             pr_err("[ERROR] Parent mismatch! Interval [%lu, %lu] right\n", my_node->start, my_node->end);
             error = 1;
         }
-        if (diff_l != 1 && diff_l != 2) {
-            pr_err("[ERROR] Rank Violation! Interval [%lu, %lu] left diff is %lu\n", my_node->start, my_node->end, diff_l);
-            error = 1;
-        }
-        if (diff_r != 1 && diff_r != 2) {
-            pr_err("[ERROR] Rank Violation! Interval [%lu, %lu] right diff is %lu\n", my_node->start, my_node->end, diff_r);
-            error = 1;
-        }
         count++;
     }
     if (verify_leftmost(root) != 0) error = 1;
     verify_interval_metadata(root->rb_root.rb_node, &error);
+    //rank
+    int final_rank = wavl_verify_reconstruct_rank(root->rb_root.rb_node);
+    if (final_rank == -999) {
+        pr_err("[WAVL ERROR] Verification FAILED. The tree is structurally broken.\n");
+        return -1;
+    }
+
     if (error) return -1; 
 
     pr_info("[OK] Interval WAVL Invariants Verified. Rank, Leftmost, Augmented check passed! (%d nodes)\n", count);

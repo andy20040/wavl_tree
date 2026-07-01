@@ -42,20 +42,21 @@ static __always_inline void __wavl_insert(struct rb_node *node, struct rb_root *
         if (unlikely(!parent)) {
 			break;
 		}
-        if (wavl_rank_diff(parent, node) != 0) //check 0 violation
-        break;
-        if(node==parent->rb_left){ //node on left
+        if (wavl_parity(node) != wavl_parity(parent)) break; //check 0 violation 
+        bool is_left = (node == parent->rb_left);
+        sibling = is_left ? parent->rb_right : parent->rb_left;
+        if (wavl_parity(parent) != wavl_parity(sibling)) { // 0 , 1 violoation 
+            wavl_flip_parity(parent); // Promote 
+            this_cpu_inc(wavl_path_length);
+            node = parent;
+            continue;
+        }
+        // 0 , 2 violation
+        if(is_left){ //node on left
             sibling=parent->rb_right;
-            if(wavl_rank_diff(parent, sibling)==1){
-                // 0,1 case go promote
-                wavl_promote(parent);
-                this_cpu_inc(wavl_path_length);
-                node=parent;
-                continue;
-            }
-            else if(!(node->rb_right)||wavl_rank_diff(node,node->rb_right)==2){ //single rotate
+            if(wavl_parity(node) == wavl_parity(node->rb_right)){ //single rotate rank diff=2
                 wavl_rotate_right(parent,root,augment_rotate); //rotate  
-                wavl_demote(parent);  //demote z
+                wavl_flip_parity(parent);  //demote z
                 /*
                  *       parent(z)
                  *      /0     \2
@@ -80,33 +81,26 @@ static __always_inline void __wavl_insert(struct rb_node *node, struct rb_root *
                  *       /   \              /    \
                  *      B     C            A      B
                 */
-                wavl_promote(y);      // promote y
-                wavl_demote(node);    // demote x
-                wavl_demote(parent); // demote z
+                wavl_flip_parity(y);      // Promote y
+                wavl_flip_parity(node);   // Demote x
+                wavl_flip_parity(parent); // Demote z
                 break; //tree is balanced
             }
         }
         else{   //node on right
             sibling=parent->rb_left;
-            if(wavl_rank_diff(parent, sibling)==1){
-                // 0,1 case go promote
-                wavl_promote(parent);
-                this_cpu_inc(wavl_path_length);
-                node=parent;
-                continue;
-            }
-            else if(!(node->rb_left)||wavl_rank_diff(node,node->rb_left)==2){  //single rotate
+            if(wavl_parity(node) == wavl_parity(node->rb_left)){  //single rotate rank diff=2
                 wavl_rotate_left(parent,root,augment_rotate); //rotate 
-                wavl_demote(parent);  //demote z
+                wavl_flip_parity(parent);  //demote z
                 break; //tree is balanced
             }
             else { //double rotate
                 struct rb_node *y = node->rb_left;
                 wavl_rotate_right(node,root,augment_rotate);
                 wavl_rotate_left(parent,root,augment_rotate);
-                wavl_promote(y); //promote y
-                wavl_demote(node);//demote x
-                wavl_demote(parent); //demot z 
+                wavl_flip_parity(y);      // Promote y
+                wavl_flip_parity(node);   // Demote x
+                wavl_flip_parity(parent); // Demote z
                 break; //tree is balanced
             }
         }
@@ -120,125 +114,94 @@ static const struct wavl_augment_callbacks dummy_callbacks = {
 	.copy = dummy_copy,
 	.rotate = dummy_rotate
 };
-static __always_inline void ____wavl_erase(struct rb_node *rebalance_node, struct rb_root *root, void (*augment_rotate)(struct rb_node *old, struct rb_node *new)) {
-    struct rb_node *x = rebalance_node; // p(x)
-    struct rb_node  *sibling;
+static __always_inline void ____wavl_erase(struct rb_node *rebalance_node, struct rb_root *root, void (*augment_rotate)(struct rb_node *old, struct rb_node *new), bool is_3_child, bool hole_on_left) {
+    struct rb_node *x = rebalance_node; 
 
-    while (true) {
-        unsigned long diff_l = wavl_rank_diff(x, x->rb_left);
-        unsigned long diff_r = wavl_rank_diff(x, x->rb_right);
-        // 2-2 leaf
-        if (diff_l == 2 && diff_r == 2 && wavl_is_leaf(x)) {
-            wavl_demote(x);
-            x = wavl_parent(x);
-            this_cpu_inc(wavl_path_length);
-            if (!x) break;
-            continue;
-        }
-        if (diff_l != 3 && diff_r != 3) {
-            break;
-        }
-        bool x_on_left = (diff_l == 3);
-        
-        if (x_on_left) { //x on left
-            sibling = x->rb_right;
-            
-            // y is 2-child 
-            if (wavl_rank_diff(x, sibling) == 2) {
-                wavl_demote(x);       // demote p(x)
-                x = wavl_parent(x);   // keep check top layer
-                this_cpu_inc(wavl_path_length);
-                if (!x) break;
-                continue;
-            }
-            
-            // y is 1-child and  2,2
-            if (wavl_rank_diff(sibling, sibling->rb_left) == 2 && 
-                wavl_rank_diff(sibling, sibling->rb_right) == 2) {
-                wavl_demote(x);       // demote p(x)
-                wavl_demote(sibling); // demote y
-                x = wavl_parent(x);   // keep check top layer
-                this_cpu_inc(wavl_path_length);
-                if (!x) break;
-                continue;
-            }
+    while (x) {
+        // =============== 3-child ===============
+        if (is_3_child) {
+            struct rb_node *sibling = hole_on_left ? x->rb_right : x->rb_left;
+            if (unlikely(!sibling)) break; 
 
-            // Rotate
-            struct rb_node *z = x;
-            struct rb_node *y = sibling;
-            struct rb_node *v = y->rb_left;
-            struct rb_node *w = y->rb_right;
-
-            // Rotate: w is 1-child 
-            if (wavl_rank_diff(y, w) == 1) {
-                wavl_rotate_left(z, root,augment_rotate);
-                wavl_promote(y);      // promote y
-                wavl_demote(z);       // demote z
-                if (wavl_is_leaf(z)) {
-                    wavl_demote(z);   
+            //  Sibling 2-child 
+            if (wavl_parity(x) == wavl_parity(sibling)) {
+                struct rb_node *p = wavl_parent(x);
+                if (p) { 
+                    is_3_child = (wavl_parity(x) == wavl_parity(p));
+                    hole_on_left = (x == p->rb_left);
                 }
-                break; // tree is balanced
+                wavl_flip_parity(x); // Demote x
+                x = p;
+                this_cpu_inc(wavl_path_length);
+                continue;
             }
-            // Double Rotate: w is 2-child ( v is 1-child)
-            else {
-                wavl_rotate_right(y, root,augment_rotate);
-                wavl_rotate_left(z, root,augment_rotate);
+            
+            //  Sibling  1-child 
+            bool sib_l_is_2 = (wavl_parity(sibling->rb_left) == wavl_parity(sibling));
+            bool sib_r_is_2 = (wavl_parity(sibling->rb_right) == wavl_parity(sibling));
+            
+            if (sib_l_is_2 && sib_r_is_2) { //  2,2 node  demote twice
+                struct rb_node *p = wavl_parent(x);
+                if (p) {
+                    is_3_child = (wavl_parity(x) == wavl_parity(p));
+                    hole_on_left = (x == p->rb_left);
+                }
+                wavl_flip_parity(x);
+                wavl_flip_parity(sibling);
+                x = p;
+                this_cpu_inc(wavl_path_length);
+                continue;
+            }
+            
+            if (hole_on_left) {
+                struct rb_node *y = sibling;
+                bool w_is_2 = (wavl_parity(y->rb_right) == wavl_parity(y));
                 
-                wavl_promote(v);      // promote v
-                wavl_promote(v);      // promote v 
-                wavl_demote(y);       // demote y
-                wavl_demote(z);       // demote z
-                wavl_demote(z);       // demote z 
-                break; // tree is balanced
+                if (!w_is_2) { //single rotate
+                    wavl_rotate_left(x, root, augment_rotate);
+                    wavl_flip_parity(y); // Promote y
+                    wavl_flip_parity(x); // Demote x
+                    if (!x->rb_left && !x->rb_right && wavl_parity(x) == 1) 
+                        wavl_flip_parity(x); //  remove 2,2 leaf
+                    break;
+                } else {  //double rotate 
+                    wavl_rotate_right(y, root, augment_rotate);
+                    wavl_rotate_left(x, root, augment_rotate);
+                    wavl_flip_parity(y); //  Demote y！
+                    break;
+                }
+            } else { 
+                struct rb_node *y = sibling;
+                bool w_is_2 = (wavl_parity(y->rb_left) == wavl_parity(y));
+                
+                if (!w_is_2) { //single rotate
+                    wavl_rotate_right(x, root, augment_rotate);
+                    wavl_flip_parity(y); 
+                    wavl_flip_parity(x); 
+                    if (!x->rb_left && !x->rb_right && wavl_parity(x) == 1) 
+                        wavl_flip_parity(x); 
+                    break;
+                } else { //double rotate 
+                    wavl_rotate_left(y, root, augment_rotate);
+                    wavl_rotate_right(x, root, augment_rotate); //no need to write code if double demote/ promote
+                    wavl_flip_parity(y); 
+                    break;
+                }
             }
         } 
-        else { //node on right
-            sibling = x->rb_left;
-            
-            if (wavl_rank_diff(x, sibling) == 2) {
-                wavl_demote(x);       
-                x = wavl_parent(x);   
-                this_cpu_inc(wavl_path_length);
-                if (!x) break;
-                continue;
+        // =============== 2,2 Leaf  ===============
+        else if (!x->rb_left && !x->rb_right && wavl_parity(x) == 1) {
+            struct rb_node *p = wavl_parent(x);
+            if (p) {
+                is_3_child = (wavl_parity(x) == wavl_parity(p));
+                hole_on_left = (x == p->rb_left);
             }
-            
-            if (wavl_rank_diff(sibling, sibling->rb_left) == 2 && 
-                wavl_rank_diff(sibling, sibling->rb_right) == 2) {
-                wavl_demote(x);       
-                wavl_demote(sibling); 
-                this_cpu_inc(wavl_path_length);
-                x = wavl_parent(x);   
-                if (!x) break;
-                continue;
-            }
-
-            struct rb_node *z = x;
-            struct rb_node *y = sibling;
-            struct rb_node *v = y->rb_right; 
-            struct rb_node *w = y->rb_left;  
-
-            if (wavl_rank_diff(y, w) == 1) {
-                wavl_rotate_right(z, root,augment_rotate);
-                wavl_promote(y);      
-                wavl_demote(z);       
-                if (wavl_is_leaf(z)) {
-                    wavl_demote(z);   
-                }
-                break; 
-            }
-   
-            else {
-                wavl_rotate_left(y, root,augment_rotate);
-                wavl_rotate_right(z, root,augment_rotate);
-                
-                wavl_promote(v);
-                wavl_promote(v);
-                wavl_demote(y);
-                wavl_demote(z);
-                wavl_demote(z);
-                break; 
-            }
+            wavl_flip_parity(x);
+            x = p;
+            this_cpu_inc(wavl_path_length);
+            continue;
+        } else {
+            break; 
         }
     }
 }
@@ -247,17 +210,37 @@ void wavl_insert(struct rb_node *node, struct rb_root *root)
 	__wavl_insert(node, root, dummy_rotate);
 }
 //EXPORT_SYMBOL(wavl_insert);
-void __wavl_erase(struct rb_node *parent, struct rb_root *root,void (*augment_rotate)(struct rb_node *old, struct rb_node *new))
+void __wavl_erase(struct rb_node *parent, struct rb_root *root,void (*augment_rotate)(struct rb_node *old, struct rb_node *new),bool is_3_child, bool hole_on_left)
 {
-	____wavl_erase(parent, root, augment_rotate);
+	____wavl_erase(parent, root, augment_rotate, is_3_child, hole_on_left);
 }
 //EXPORT_SYMBOL(__wavl_erase);
 void wavl_erase(struct rb_node *node, struct rb_root *root)
 {
-	struct rb_node *rebalance;
-	rebalance = __wavl_erase_augmented(node, root, &dummy_callbacks);
-	if (rebalance)
-		____wavl_erase(rebalance, root, dummy_rotate);
+    struct rb_node *victim = node;
+    struct rb_node *p_victim;
+    struct rb_node *w; //node to come up
+    bool is_3_child = false;
+    bool hole_on_left = false;
+    //successor
+    if (node->rb_left && node->rb_right) {
+        victim = node->rb_right;
+        while (victim->rb_left) {
+            victim = victim->rb_left;
+        }
+    }
+
+    w = victim->rb_left ? victim->rb_left : victim->rb_right;
+    p_victim = wavl_parent(victim);
+    
+    if (p_victim) {
+        is_3_child = (wavl_parity(p_victim) != wavl_parity(w));
+        hole_on_left = (victim == p_victim->rb_left);
+    }
+    struct rb_node *rebalance = __wavl_erase_augmented(node, root, &dummy_callbacks);
+    if (rebalance) {
+        ____wavl_erase(rebalance, root, dummy_rotate, is_3_child, hole_on_left);
+    }
 }
 //EXPORT_SYMBOL(wavl_erase);
 

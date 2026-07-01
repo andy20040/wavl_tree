@@ -2,8 +2,8 @@
 #define _WAVL_TREE_AUGMENTED_H
 #include "wavltree.h"
 #include <linux/rcupdate.h>
-#define WAVL_RANK_MASK 3UL       
-#define WAVL_PARENT_MASK ~3UL    
+#define WAVL_PARITY_MASK 1UL       
+#define WAVL_PARENT_MASK ~1UL    
 
 struct wavl_augment_callbacks {
     void (*propagate)(struct rb_node *node, struct rb_node *stop);
@@ -12,7 +12,7 @@ struct wavl_augment_callbacks {
 };
 
 extern void __wavl_insert_augmented(struct rb_node *node, struct rb_root *root,void (*augment_rotate)(struct rb_node *old, struct rb_node *new));
-extern void __wavl_erase(struct rb_node *parent, struct rb_root *root,void (*augment_rotate)(struct rb_node *old, struct rb_node *new));
+extern void __wavl_erase(struct rb_node *parent, struct rb_root *root,void (*augment_rotate)(struct rb_node *old, struct rb_node *new),bool is_3_child, bool hole_on_left);
 static inline void wavl_insert_augmented(struct rb_node *node, struct rb_root *root,
                       const struct wavl_augment_callbacks *augment)
 {
@@ -55,11 +55,15 @@ wavl_add_augmented_cached(struct rb_node *node, struct rb_root_cached *tree,
 
 
 
-
-static inline unsigned long wavl_rank(struct rb_node *node) {
-    if (!node) return 3UL; 
-    return node->__rb_parent_color & WAVL_RANK_MASK;
+static inline unsigned long wavl_parity(const struct rb_node *node) {
+    return node ? (node->__rb_parent_color & WAVL_PARITY_MASK) : 1UL; 
 }
+
+static inline void wavl_flip_parity(struct rb_node *node) {
+    node->__rb_parent_color ^= WAVL_PARITY_MASK;
+}
+
+
 
 static inline struct rb_node *wavl_parent(struct rb_node *node) {
     return (struct rb_node *)(node->__rb_parent_color & WAVL_PARENT_MASK);
@@ -71,21 +75,11 @@ static bool wavl_is_leaf(struct rb_node *node) {
 }
 
 
-static inline void wavl_set_rank(struct rb_node *node, unsigned long rank) {
-    node->__rb_parent_color = (node->__rb_parent_color & WAVL_PARENT_MASK) | (rank & WAVL_RANK_MASK);
+static inline void wavl_set_parity(struct rb_node *node, unsigned long parity) {
+    node->__rb_parent_color = (node->__rb_parent_color & WAVL_PARENT_MASK) | (parity & WAVL_PARITY_MASK);
 }
 
 
-static inline void wavl_promote(struct rb_node *node) {
-    wavl_set_rank(node, wavl_rank(node) + 1);
-}
-static inline void wavl_demote(struct rb_node *node) {
-    wavl_set_rank(node, wavl_rank(node) - 1);
-}
-
-static inline unsigned long wavl_rank_diff(struct rb_node *parent, struct rb_node *child) {
-    return (wavl_rank(parent) - wavl_rank(child)) & WAVL_RANK_MASK;
-}
 
 
 static inline void wavl_change_child(struct rb_node *old, struct rb_node *new, struct rb_node *parent, struct rb_root *root) {
@@ -113,9 +107,8 @@ __wavl_change_child_rcu(struct rb_node *old, struct rb_node *new,
 
 
 
-
 static inline void wavl_set_parent(struct rb_node *node, struct rb_node *parent) {
-    node->__rb_parent_color = ((unsigned long)parent & WAVL_PARENT_MASK) | wavl_rank(node);
+    node->__rb_parent_color = ((unsigned long)parent & WAVL_PARENT_MASK) | wavl_parity(node);
 }
 
 
@@ -195,17 +188,19 @@ __wavl_erase_augmented(struct rb_node *node, struct rb_root *root,
         if (child2) wavl_set_parent(child2, parent);
         
         wavl_set_parent(successor, old_parent);
-        wavl_set_rank(successor, wavl_rank(node)); 
+        wavl_set_parity(successor, wavl_parity(node)); 
 
         tmp = successor; // for augmented
     }
 
     // check whether parent violate
     if (parent) {
-        unsigned long diff_l = wavl_rank_diff(parent, parent->rb_left);
-        unsigned long diff_r = wavl_rank_diff(parent, parent->rb_right);
-        //whether 3-child or 2,2 node
-        if (diff_l == 3 || diff_r == 3 || (diff_l == 2 && diff_r == 2 && wavl_is_leaf(parent))) {
+        unsigned long p_p = wavl_parity(parent);
+        unsigned long l_p = wavl_parity(parent->rb_left);
+        unsigned long r_p = wavl_parity(parent->rb_right);
+        if ( (l_p == p_p && parent->rb_left) || 
+            (r_p == p_p && parent->rb_right) || 
+            (wavl_is_leaf(parent) && wavl_parity(parent) == 1) ) {
             rebalance_node = parent;
         }
     }
@@ -218,9 +213,27 @@ static __always_inline void
 wavl_erase_augmented(struct rb_node *node, struct rb_root *root,
 		   const struct wavl_augment_callbacks *augment)
 {
+    struct rb_node *victim = node;
+    struct rb_node *p_victim;
+    struct rb_node *w; 
+    bool is_3_child = false;
+    bool hole_on_left = false;
+    if (node->rb_left && node->rb_right) {
+        victim = node->rb_right;
+        while (victim->rb_left) {
+            victim = victim->rb_left;
+        }
+    }
+    w = victim->rb_left ? victim->rb_left : victim->rb_right;
+    p_victim = wavl_parent(victim);
+    
+    if (p_victim) {
+        is_3_child = (wavl_parity(p_victim) != wavl_parity(w));
+        hole_on_left = (victim == p_victim->rb_left);
+    }
 	struct rb_node *rebalance = __wavl_erase_augmented(node, root, augment);
-	if (rebalance)
-		__wavl_erase(rebalance, root, augment->rotate);
+    if (rebalance)
+		__wavl_erase(rebalance, root, augment->rotate, is_3_child, hole_on_left);
 }
 
 

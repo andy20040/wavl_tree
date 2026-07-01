@@ -1,3 +1,2 @@
-sh: Interrupt
-4849132,,L1-dcache-load-misses,6083656742,100.00,,
-30038816,,branch-misses,6083656742,100.00,,
+9619143,,L1-dcache-load-misses,143703922,100.00,,
+10251780,,branch-misses,143703922,100.00,,
