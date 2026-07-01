@@ -194,16 +194,7 @@ __wavl_erase_augmented(struct rb_node *node, struct rb_root *root,
     }
 
     // check whether parent violate
-    if (parent) {
-        unsigned long p_p = wavl_parity(parent);
-        unsigned long l_p = wavl_parity(parent->rb_left);
-        unsigned long r_p = wavl_parity(parent->rb_right);
-        if ( (l_p == p_p && parent->rb_left) || 
-            (r_p == p_p && parent->rb_right) || 
-            (wavl_is_leaf(parent) && wavl_parity(parent) == 1) ) {
-            rebalance_node = parent;
-        }
-    }
+    rebalance_node = parent;
 
     if (augment->propagate) augment->propagate(tmp, NULL);
     
