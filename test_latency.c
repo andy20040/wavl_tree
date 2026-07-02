@@ -393,10 +393,16 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         if (strstr(cmd, "_wavl") != NULL) { run_rb = 0; }
         
         u64 t_start, t_end;
-        u64 rb_mixed_time = 0, wavl_mixed_time = 0;
-        
+        u64 rb_ins_time = 0, rb_lookup_time = 0, rb_del_time = 0;
+        u64 wavl_ins_time = 0, wavl_lookup_time = 0, wavl_del_time = 0;
+        u64 rb_ins_count = 0, rb_del_count = 0;
+        u64 wavl_ins_count = 0, wavl_del_count = 0;
+
         u8 *in_tree_rb = NULL;
         u8 *in_tree_wavl = NULL;
+        
+        struct my_node **rb_pool = NULL;
+        struct my_node **wavl_pool = NULL;
 
         pr_info("[Latency-Test] Starting %s workload (Pool: %d, Ops: %d)...\n", cmd, POOL_SIZE, MIXED_OPS);
 
@@ -406,42 +412,52 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         if (run_rb) {
             u32 prng_state = 123456789; 
             in_tree_rb = vzalloc(POOL_SIZE * sizeof(u8));
-            if (!in_tree_rb) return -ENOMEM;
-
+            rb_pool = vzalloc(POOL_SIZE * sizeof(struct my_node *));
+            
+            if (!in_tree_rb || !rb_pool) return -ENOMEM;
+            for (i = 0; i < POOL_SIZE; i++) {
+                rb_pool[i] = kmalloc(sizeof(struct my_node), GFP_KERNEL);
+                if (rb_pool[i]) rb_pool[i]->key = i;
+            }
+            /* 1. Warm-up Phase */
             for (i = 0; i < POOL_SIZE / 2; i++) {
                 u32 random_key = my_xorshift32(&prng_state) % POOL_SIZE;
                 if (!in_tree_rb[random_key]) {
-                    struct my_node *new_node = kmalloc(sizeof(*new_node), GFP_KERNEL);
-                    if (new_node) {
-                        new_node->key = random_key;
-                        do_rb_insert(new_node, &my_test_tree);
-                        in_tree_rb[random_key] = 1;
-                    }
+                    do_rb_insert(rb_pool[random_key], &my_test_tree);
+                    in_tree_rb[random_key] = 1;
                 }
             }
-            /* 2. Mixed Measurement Phase:  */
-            t_start = ktime_get_ns();
+            /* 2. Mixed Measurement Phase */
             for (i = 0; i < MIXED_OPS; i++) {
                 u32 random_key = my_xorshift32(&prng_state) % POOL_SIZE;
                 
                 if (in_tree_rb[random_key]) {
+                    /* --  Lookup -- */
+                    t_start = ktime_get_ns();
                     struct my_node *target = do_search(random_key, &my_test_tree);
+                    t_end = ktime_get_ns();
+                    rb_lookup_time += (t_end - t_start);
+
+                    /* --  Delete -- */
                     if (target) {
+                        t_start = ktime_get_ns();
                         rb_erase(&target->node, &my_test_tree);
-                        kfree(target);
-                        in_tree_rb[random_key] = 0;
+                        t_end = ktime_get_ns();
+                        rb_del_time += (t_end - t_start);
+                        rb_del_count++;
                     }
+                    in_tree_rb[random_key] = 0; 
                 } else {
-                    struct my_node *new_node = kmalloc(sizeof(*new_node), GFP_KERNEL);
-                    if (new_node) {
-                        new_node->key = random_key;
-                        do_rb_insert(new_node, &my_test_tree);
-                        in_tree_rb[random_key] = 1;
-                    }
+                    /* --  Insert -- */
+                    t_start = ktime_get_ns();
+                    do_rb_insert(rb_pool[random_key], &my_test_tree);
+                    t_end = ktime_get_ns();
+                    rb_ins_time += (t_end - t_start);
+                    rb_ins_count++;
+                    
+                    in_tree_rb[random_key] = 1; 
                 }
             }
-            t_end = ktime_get_ns();
-            rb_mixed_time = (t_end - t_start);
         }
 
         /* ==========================================================
@@ -450,79 +466,92 @@ static ssize_t rbtree_proc_write(struct file *file, const char __user *buf_user,
         if (run_wavl) {
             u32 prng_state = 123456789;
             in_tree_wavl = vzalloc(POOL_SIZE * sizeof(u8));
-            if (!in_tree_wavl) {
-                if (in_tree_rb) vfree(in_tree_rb);
-                return -ENOMEM;
+            wavl_pool = vzalloc(POOL_SIZE * sizeof(struct my_node *));
+            
+            if (!in_tree_wavl || !wavl_pool) return -ENOMEM;
+            for (i = 0; i < POOL_SIZE; i++) {
+                wavl_pool[i] = kmalloc(sizeof(struct my_node), GFP_KERNEL);
+                if (wavl_pool[i]) wavl_pool[i]->key = i;
             }
-
-            /* 1. Warm-up Phase  */
+            /* 1. Warm-up Phase */
             for (i = 0; i < POOL_SIZE / 2; i++) {
                 u32 random_key = my_xorshift32(&prng_state) % POOL_SIZE;
                 if (!in_tree_wavl[random_key]) {
-                    struct my_node *new_node = kmalloc(sizeof(*new_node), GFP_KERNEL);
-                    if (new_node) {
-                        new_node->key = random_key;
-                        do_wavl_insert(new_node, &my_wavl_tree);
-                        in_tree_wavl[random_key] = 1;
-                    }
+                    do_wavl_insert(wavl_pool[random_key], &my_wavl_tree);
+                    in_tree_wavl[random_key] = 1;
                 }
             }
-            /* 2. Mixed Measurement Phase  */
-            t_start = ktime_get_ns();
+            /* 2. Mixed Measurement Phase */
             for (i = 0; i < MIXED_OPS; i++) {
                 u32 random_key = my_xorshift32(&prng_state) % POOL_SIZE;
                 
                 if (in_tree_wavl[random_key]) {
+                    /* --  Lookup -- */
+                    t_start = ktime_get_ns();
                     struct my_node *target = do_search(random_key, &my_wavl_tree);
+                    t_end = ktime_get_ns();
+                    wavl_lookup_time += (t_end - t_start);
+
+                    /* --  Delete -- */
                     if (target) {
+                        t_start = ktime_get_ns();
                         wavl_erase(&target->node, &my_wavl_tree);
-                        kfree(target);
-                        in_tree_wavl[random_key] = 0;
+                        t_end = ktime_get_ns();
+                        wavl_del_time += (t_end - t_start);
+                        wavl_del_count++;
                     }
+                    in_tree_wavl[random_key] = 0;
                 } else {
-                    struct my_node *new_node = kmalloc(sizeof(*new_node), GFP_KERNEL);
-                    if (new_node) {
-                        new_node->key = random_key;
-                        do_wavl_insert(new_node, &my_wavl_tree);
-                        in_tree_wavl[random_key] = 1;
-                    }
+                    /* --  Insert -- */
+                    t_start = ktime_get_ns();
+                    do_wavl_insert(wavl_pool[random_key], &my_wavl_tree);
+                    t_end = ktime_get_ns();
+                    wavl_ins_time += (t_end - t_start);
+                    wavl_ins_count++;
+                    
+                    in_tree_wavl[random_key] = 1;
                 }
             }
-            t_end = ktime_get_ns();
-            wavl_mixed_time = (t_end - t_start);
         }
 
         /* ==========================================================
-         * Cleanup
+         * Report & Cleanup
          * ========================================================== */
         pr_info("==================================================\n");
-        pr_info("     [ Mixed Latency Benchmark (ns) ]\n");
+        pr_info("     [ Mixed Latency Detailed Benchmark (ns) ]\n");
         pr_info("==================================================\n");
         pr_info("Workload Type     : %s\n", cmd);
         pr_info("Total Pool Size   : %d\n", POOL_SIZE);
         pr_info("Total Mixed Ops   : %d\n", MIXED_OPS);
         pr_info("==================================================\n");
-        pr_info("Metric (Total)    |    Native RB   |    WAVL Tree\n");
+        pr_info("Metric (Avg)      |    Native RB   |    WAVL Tree\n");
         pr_info("--------------------------------------------------\n");
-        pr_info("Total Mixed Time  | %9llu ns | %9llu ns\n", rb_mixed_time, wavl_mixed_time);
-        pr_info("Avg Op Latency    | %9llu ns | %9llu ns\n", 
-                MIXED_OPS > 0 ? rb_mixed_time / MIXED_OPS : 0, 
-                MIXED_OPS > 0 ? wavl_mixed_time / MIXED_OPS : 0);
+        pr_info("Avg Insert Latency| %9llu ns | %9llu ns\n", 
+                rb_ins_count > 0 ? rb_ins_time / rb_ins_count : 0, 
+                wavl_ins_count > 0 ? wavl_ins_time / wavl_ins_count : 0);
+        pr_info("Avg Lookup Latency| %9llu ns | %9llu ns\n", 
+                rb_del_count > 0 ? rb_lookup_time / rb_del_count : 0, 
+                wavl_del_count > 0 ? wavl_lookup_time / wavl_del_count : 0);
+        pr_info("Avg Erase Latency | %9llu ns | %9llu ns\n", 
+                rb_del_count > 0 ? rb_del_time / rb_del_count : 0, 
+                wavl_del_count > 0 ? wavl_del_time / wavl_del_count : 0);
         pr_info("==================================================\n");
 
         if (run_rb) {
-            struct rb_node *node;
-            struct my_node *pos, *n;
-            rbtree_postorder_for_each_entry_safe(pos, n, &my_test_tree, node) kfree(pos);
-            my_test_tree = RB_ROOT;
+            for (i = 0; i < POOL_SIZE; i++) {
+                if (rb_pool[i]) kfree(rb_pool[i]);
+            }
+            vfree(rb_pool);
             vfree(in_tree_rb);
+            my_test_tree = RB_ROOT;
         }
         if (run_wavl) {
-            struct rb_node *node;
-            struct my_node *pos, *n;
-            rbtree_postorder_for_each_entry_safe(pos, n, &my_wavl_tree, node) kfree(pos);
-            my_wavl_tree = RB_ROOT;
+            for (i = 0; i < POOL_SIZE; i++) {
+                if (wavl_pool[i]) kfree(wavl_pool[i]);
+            }
+            vfree(wavl_pool);
             vfree(in_tree_wavl);
+            my_wavl_tree = RB_ROOT;
         }
     }
     else {
