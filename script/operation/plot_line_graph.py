@@ -11,7 +11,7 @@ if not os.path.exists(output_dir):
 
 
 try:
-    df = pd.read_csv('../../trace_data/perf/results_random.csv')
+    df = pd.read_csv('../../trace_data/operation/results_random.csv')
 except FileNotFoundError:
     print(" results_random.csv not found")
     exit()
