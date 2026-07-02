@@ -122,9 +122,9 @@ static __always_inline void ____wavl_erase(struct rb_node *rebalance_node, struc
         if (is_3_child) {
             struct rb_node *sibling = hole_on_left ? x->rb_right : x->rb_left;
             if (unlikely(!sibling)) break; 
-
+            unsigned long s_p = sibling->__rb_parent_color & WAVL_PARITY_MASK; //sibling parity
             //  Sibling 2-child 
-            if (wavl_parity(x) == wavl_parity(sibling)) {
+            if (wavl_parity(x) == s_p) {
                 struct rb_node *p = wavl_parent(x);
                 if (p) { 
                     is_3_child = (wavl_parity(x) == wavl_parity(p));
@@ -136,11 +136,7 @@ static __always_inline void ____wavl_erase(struct rb_node *rebalance_node, struc
                 continue;
             }
             
-            //  Sibling  1-child 
-            bool sib_l_is_2 = (wavl_parity(sibling->rb_left) == wavl_parity(sibling));
-            bool sib_r_is_2 = (wavl_parity(sibling->rb_right) == wavl_parity(sibling));
-            
-            if (sib_l_is_2 && sib_r_is_2) { //  2,2 node  demote twice
+            if (wavl_parity(sibling->rb_left) == s_p && wavl_parity(sibling->rb_right) == s_p) { //  2,2 node  demote twice
                 struct rb_node *p = wavl_parent(x);
                 if (p) {
                     is_3_child = (wavl_parity(x) == wavl_parity(p));
@@ -155,9 +151,7 @@ static __always_inline void ____wavl_erase(struct rb_node *rebalance_node, struc
             
             if (hole_on_left) {
                 struct rb_node *y = sibling;
-                bool w_is_2 = (wavl_parity(y->rb_right) == wavl_parity(y));
-                
-                if (!w_is_2) { //single rotate
+                if (wavl_parity(y->rb_right) != s_p) { //single rotate
                     wavl_rotate_left(x, root, augment_rotate);
                     wavl_flip_parity(y); // Promote y
                     wavl_flip_parity(x); // Demote x
@@ -171,10 +165,8 @@ static __always_inline void ____wavl_erase(struct rb_node *rebalance_node, struc
                     break;
                 }
             } else { 
-                struct rb_node *y = sibling;
-                bool w_is_2 = (wavl_parity(y->rb_left) == wavl_parity(y));
-                
-                if (!w_is_2) { //single rotate
+                struct rb_node *y = sibling;    
+                if (wavl_parity(y->rb_left) != s_p) { //single rotate
                     wavl_rotate_right(x, root, augment_rotate);
                     wavl_flip_parity(y); 
                     wavl_flip_parity(x); 
